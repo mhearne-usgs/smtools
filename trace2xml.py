@@ -7,26 +7,70 @@ from datetime import datetime
 
 #third party imports
 from obspy import read
-from obspy.signal.freqattributes import pgm
+from obspy.signal.invsim import seisSim, cornFreq2Paz
 from neicio.tag import Tag
 from obspy.xseed.parser import Parser
 import matplotlib.pyplot as plt
+from matplotlib import dates
 
 FILTER_FREQ = 0.02
 CORNERS = 4
-PSA03FREQ = 3.333
-PSA10FREQ = 1.0
-PSA30FREQ = 0.333
-DAMPING = 0.05
 
-def trace2xml(traces,parser,outfolder):
+def smPSA(data, samp_rate):
     """
-    @param trace - ObsPy Trace object
+    ShakeMap pseudo-spectral parameters
+
+    Compute 5% damped PSA at 0.3, 1.0, and 3.0 seconds.
+
+    Data must be an acceleration Trace
+
+    :type data: :class:`obspy.trace`
+    :param data: Data in acceleration to convolve with pendulum at freq.
+    :type delta: float
+    :param delta: sample rate (samples per sec)
+    :rtype: (float, float, float)
+    :return: PSA03, PSA10, PSA30
+    """
+
+    D = 0.05	# 5% damping
+
+    out = []
+    periods = [0.3, 1.0, 3.0]
+    for T in periods:
+        freq = 1.0 / T
+        omega = (2 * 3.14159 * freq) ** 2
+
+        paz_sa = cornFreq2Paz(freq, damp=D)
+        paz_sa['sensitivity'] = omega
+        paz_sa['zeros'] = []
+        dd = seisSim(data.data, samp_rate, paz_remove=None, paz_simulate=paz_sa,
+                     taper=True, simulate_sensitivity=True, taper_fraction=0.05)
+
+        if abs(max(dd)) >= abs(min(dd)):
+            psa = abs(max(dd))
+        else:
+            psa = abs(min(dd))
+        out.append(psa)
+
+    return out
+
+def trace2xml(traces,parser,outfolder,doPlot=False):
+    """
+    Calibrate accelerometer data, derive peak ground motion values, and write a ShakeMap-compatible data file.
+
+    Takes a sequence of ObsPy Trace objects and an ObsPy Parser (such as from a dataless SEED file) and
+    calibrates the data in the Traces, derives peak ground motions for each (pga,pgv,psa) and then 
+    writes those data to a ShakeMap-compatible XML data file.
+    
+    @param traces - Sequence of ObsPy Trace objects
     @param parser - ObsPy Parser object
-    @outfolder - Path where output data XML files should be written.
+    @param outfolder - Path (string) where output data XML files and QA plots should be written.
     """
+    vdict = parser.getInventory()
     #Make the top level tag - stationlist
     stationlist_tag = Tag('stationlist',attributes={'created':datetime.utcnow().strftime('%s')})
+    first_station = 1
+    current_tag = ''
     for trace in traces:
         net = trace.stats['network']
         station = trace.stats['station']
@@ -44,50 +88,57 @@ def trace2xml(traces,parser,outfolder):
         trace.filter('highpass',freq=FILTER_FREQ,zerophase=True,corners=CORNERS)
         trace.detrend('simple')
         trace.detrend('demean')
-        trace.integrate() #default cumtrapz - trace now has velocity
-        #plot the velocity in a top plot
-        plt.subplot(2,1,1)
-        plt.plot(trace.data)
+        
+        #plot the acceleration (top) and velocity
+        plt.clf()
+        ax1 = plt.subplot(2,1,1)
+        atimes = trace.times()
+        atimes = [(trace.stats['starttime'] + t).datetime for t in atimes]
+        matimes = dates.date2num(atimes)
+        hfmt = dates.DateFormatter('%H:%M:%S')
+        plt.plot(matimes,trace.data)
+        ax1.xaxis.set_major_locator(dates.MinuteLocator())
+        ax1.xaxis.set_major_formatter(hfmt)
+        plt.title('Acceleration')
+        plt.ylabel('$m/s^2$')
+        #plt.xticks(rotation=-45)
+        
+        vtrace = trace.copy()
+        vtrace.integrate() # vtrace now has velocity
+        vtimes = vtrace.times()
+        vtimes = [(trace.stats['starttime'] + t).datetime for t in vtimes]
+        mvtimes = dates.date2num(vtimes)
+        ax2 = plt.subplot(2,1,2)
+        plt.plot(mvtimes,vtrace.data)
+        ax2.xaxis.set_major_locator(dates.MinuteLocator())
+        ax2.xaxis.set_major_formatter(hfmt)
         plt.title('Velocity')
-        plt.ylabel('m/s')
-        trace.detrend('simple')
-        trace.detrend('demean')
-        trace.integrate() #trace now has displacement
-        plt.subplot(2,1,2)
-        plt.plot(trace.data)
-        plt.title('Displacement')
-        plt.ylabel('m')
+        plt.ylabel('$m/s$')
+        #plt.xticks(rotation=-45)
         pngfile = os.path.join(outfolder,'%s.png' % channel_id)
         plt.savefig(pngfile)
-        (psa03,disp,vel,pga) = pgm(trace.data, 1/delta, PSA03FREQ,damp=DAMPING)
-        (psa10,tmp1,tmp2,tmp3) = pgm(trace.data, 1/delta, PSA10FREQ,damp=DAMPING)
-        (psa30,tmp1,tmp2,tmp3) = pgm(trace.data, 1/delta, PSA30FREQ,damp=DAMPING)
 
-        #convert accelerations to %g and cm/s
-        psa03 = psa03/0.098
-        psa10 = psa10/0.098
-        psa30 = psa30/0.098
-        pga = pga/0.098
-        vel = vel * 100
+        # Get the Peak Ground Acceleration
+        pga = abs(trace.max())
 
-        vdict = parser.getInventory()
-        station_name = 'UNK'
-        for sta in vdict['stations']:
-            if sta['station_id'] == '%s.%s' % (net,station):
-                station_name = sta['station_name']
-                break
-        instrument = 'UNK'
-        for cha in vdict['channels']:
-            if cha['channel_id'] == '%s.%s' % (net,station):
-                instrument = cha['instrument']
-                break
+        # Get the Peak Ground Velocity
+        pgv = abs(vtrace.max())
+
+        (psa03, psa10, psa30) = smPSA(trace, delta)
+
+        #convert accelerations to %g and velocity cm/s
+        psa03 = psa03/0.0981
+        psa10 = psa10/0.0981
+        psa30 = psa30/0.0981
+        pga = pga/0.0981
+        pgv = pgv * 100
 
         #make the tags for the individual measurements
         psa03tag = Tag('psa03',attributes={'value':psa03})
         psa10tag = Tag('psa10',attributes={'value':psa10})
         psa30tag = Tag('psa30',attributes={'value':psa30})
         acctag = Tag('acc',attributes={'value':pga})
-        veltag = Tag('vel',attributes={'value':vel})
+        veltag = Tag('vel',attributes={'value':pgv})
 
         #make the component tag to hold the measurements
         comptag = Tag('comp',attributes={'name':channel})
@@ -96,18 +147,42 @@ def trace2xml(traces,parser,outfolder):
         comptag.addChild(psa03tag)
         comptag.addChild(psa10tag)
         comptag.addChild(psa30tag)
-        code = '%s.%s' % (net,station)
-        lat = coordinates['latitude']
-        lon = coordinates['longitude']
-        stationtag = Tag('station',attributes={'code':code,'name':station_name,
-                                               'insttype':instrument,'source':'',
-                                               'netid':net,'commtype':'DIG',
-                                               'lat':lat,'lon':lon,
-                                               'loc':station_name})
-        stationtag.addChild(comptag)
-        stationlist_tag.addChild(stationtag)
 
-    outfile = os.path.join(outfolder,'%s_dat.xml' % channel_id)
+        code = '%s.%s' % (net,station)
+        if current_tag == code:		# Same station: just add the comp tag
+            stationtag.addChild(comptag)
+        else:				# New station: start a new station tag
+            if not first_station:	# Close out the previous station
+                stationlist_tag.addChild(stationtag)
+            station_name = 'UNK'
+            for sta in vdict['stations']:
+                if sta['station_id'] == '%s.%s' % (net,station):
+                    station_name = sta['station_name']
+                    break
+            instrument = 'UNK'
+            for cha in vdict['channels']:
+                if cha['channel_id'] == channel_id:
+                    instrument = cha['instrument']
+                    break
+            source = ''
+            for netw in vdict['networks']:
+                if netw['network_code'] == net:
+                    source = netw['network_name']
+                    break
+            lat = coordinates['latitude']
+            lon = coordinates['longitude']
+            stationtag = Tag('station',attributes={'code':code,'name':station_name,
+                                                   'insttype':instrument,'source':source,
+                                                   'netid':net,'commtype':'DIG',
+                                                   'lat':lat,'lon':lon,
+                                                   'loc':station_name})
+            stationtag.addChild(comptag)
+            current_tag = code
+            first_station = 0
+
+    if not first_station:	# Add the final station to the list
+        stationlist_tag.addChild(stationtag)
+    outfile = os.path.join(outfolder,'trace2xml_dat.xml')
     print 'Saving to %s' % outfile
     stationlist_tag.renderToXML(filename=outfile,ntabs=1)
 
@@ -119,4 +194,4 @@ if __name__ == '__main__':
     for sacfile in sacfiles:
         stream = read(sacfile)
         traces.append(stream[0])
-    trace2xml(traces,parser,os.getcwd())
+    trace2xml(traces,parser,os.getcwd(),doPlot=True)
