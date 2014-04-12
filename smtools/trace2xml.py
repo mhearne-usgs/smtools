@@ -62,29 +62,43 @@ def trace2xml(traces,parser,outfolder,doPlot=False):
     calibrates the data in the Traces, derives peak ground motions for each (pga,pgv,psa) and then 
     writes those data to a ShakeMap-compatible XML data file.
     
-    @param traces - Sequence of ObsPy Trace objects
-    @param parser - ObsPy Parser object
+    @param traces - Sequence of ObsPy Trace objects, containing acceleration data in units of m/s^2.
+    @param parser - ObsPy Parser object.  Can also be None, in which case calibration step is NOT performed, and station coordinates will have to be present in the input traces.
     @param outfolder - Path (string) where output data XML files and QA plots should be written.
     """
-    vdict = parser.getInventory()
+    if parser is not None:
+        vdict = parser.getInventory()
+    else:
+        vdict = None
     #Make the top level tag - stationlist
     stationlist_tag = Tag('stationlist',attributes={'created':datetime.utcnow().strftime('%s')})
     first_station = 1
     current_tag = ''
+    plotfiles = []
     for trace in traces:
         net = trace.stats['network']
         station = trace.stats['station']
         location = trace.stats['location']
         channel = trace.stats['channel']
         channel_id = '%s.%s.%s.%s' % (net,station,location,channel)
-        paz = parser.getPAZ(channel_id)
-        coordinates = parser.getCoordinates(channel_id)
+        if parser is not None:
+            paz = parser.getPAZ(channel_id)
+            coordinates = parser.getCoordinates(channel_id)
+        else:
+            try:
+                coordinates = {'latitude':trace.stats['lat'],
+                               'longitude':trace.stats['lon'],
+                               'elevation':trace.stats['height']}
+            except:
+                sys.stderr.write('Could not get station coordinates from trace object of station %s\n' % station)
+                continue
 
         delta = trace.stats['sampling_rate']
         trace.detrend('simple')
         trace.detrend('demean')
         trace.taper()
-        trace.simulate(paz_remove=paz,remove_sensitivity=True,simulate_sensitivity=False)
+        if parser is not None:
+            trace.simulate(paz_remove=paz,remove_sensitivity=True,simulate_sensitivity=False)
         trace.filter('highpass',freq=FILTER_FREQ,zerophase=True,corners=CORNERS)
         trace.detrend('simple')
         trace.detrend('demean')
@@ -117,6 +131,7 @@ def trace2xml(traces,parser,outfolder,doPlot=False):
         #plt.xticks(rotation=-45)
         pngfile = os.path.join(outfolder,'%s.png' % channel_id)
         plt.savefig(pngfile)
+        plotfiles.append(pngfile)
 
         # Get the Peak Ground Acceleration
         pga = abs(trace.max())
@@ -155,20 +170,25 @@ def trace2xml(traces,parser,outfolder,doPlot=False):
             if not first_station:	# Close out the previous station
                 stationlist_tag.addChild(stationtag)
             station_name = 'UNK'
-            for sta in vdict['stations']:
-                if sta['station_id'] == '%s.%s' % (net,station):
-                    station_name = sta['station_name']
-                    break
-            instrument = 'UNK'
-            for cha in vdict['channels']:
-                if cha['channel_id'] == channel_id:
-                    instrument = cha['instrument']
-                    break
-            source = ''
-            for netw in vdict['networks']:
-                if netw['network_code'] == net:
-                    source = netw['network_name']
-                    break
+            if vdict is not None:
+                for sta in vdict['stations']:
+                    if sta['station_id'] == '%s.%s' % (net,station):
+                        station_name = sta['station_name']
+                        break
+                instrument = 'UNK'
+                for cha in vdict['channels']:
+                    if cha['channel_id'] == channel_id:
+                        instrument = cha['instrument']
+                        break
+                source = ''
+                for netw in vdict['networks']:
+                    if netw['network_code'] == net:
+                        source = netw['network_name']
+                        break
+            else:
+                station_name = trace.stats['station']
+                instrument = ''
+                source = ''
             lat = coordinates['latitude']
             lon = coordinates['longitude']
             stationtag = Tag('station',attributes={'code':code,'name':station_name,
@@ -182,9 +202,10 @@ def trace2xml(traces,parser,outfolder,doPlot=False):
 
     if not first_station:	# Add the final station to the list
         stationlist_tag.addChild(stationtag)
-    outfile = os.path.join(outfolder,'trace2xml_dat.xml')
+    outfile = os.path.join(outfolder,'%s_dat.xml' % net)
     print 'Saving to %s' % outfile
     stationlist_tag.renderToXML(filename=outfile,ntabs=1)
+    return (outfile,plotfiles)
 
 if __name__ == '__main__':
     seedfile = sys.argv[1]
