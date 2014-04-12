@@ -10,7 +10,7 @@ import urlparse
 import sys
 import tarfile
 from datetime import datetime,timedelta
-from ConfigParser import ConfigParser
+from ConfigParser import ConfigParser,RawConfigParser
 import os.path
 import argparse
 
@@ -91,7 +91,33 @@ def maketime(timestring):
             raise Exception,'Could not parse time or date from %s' % timestring
     return outtime
 
+
+def doConfig():
+    shakehome = raw_input('Please specify the root folder where ShakeMap is installed: ')
+    if not os.path.isdir(shakehome):
+        print '%s is not a valid path.  Returning.' % shakehome
+    user = raw_input('Please specify K-NET user name: ')
+    password = raw_input('Please specify K-NET password: ')
+    config = RawConfigParser()
+    config.add_section('KNET')
+    config.add_section('SHAKEMAP')
+    config.set('KNET','user',user)
+    config.set('KNET','password',password)
+    config.set('SHAKEMAP','shakehome',shakehome)
+    homedir = os.path.expanduser('~')
+    configfolder = os.path.join(homedir,'.smtools')
+    configfile = os.path.join(configfolder,'config.ini')
+    if not os.path.isdir(configfolder):
+        os.makedirs(configfolder)
+    with open(configfile, 'wb') as configfile:
+        config.write(configfile)
+    
+    
+
 def main(args,config):
+    if args.doConfig:
+        doConfig()
+        sys.exit(0)
     if args.eventID and config is None:
         print 'To specify event ID, you must have configured the ShakeHome parameter in the config file.'
         print 'Re-run with -config.  Returning.'
@@ -156,7 +182,7 @@ def main(args,config):
         traces.append(trace)
 
     stationfile = trace2xml(traces,None,outfolder,doPlot=args.doPlot)
-    print 'Wrote %i channels to data file %s' % stationfile
+    print 'Wrote %i channels to data file %s' % (len(traces),stationfile)
     if not args.keeptar:
         os.remove(tarfile)
         for dfile in datafiles:
@@ -172,16 +198,24 @@ if __name__ == '__main__':
     if os.path.isfile(configfile):
         config = ConfigParser()
         config.readfp(open(configfile))
-
+    desc = '''Download and process K-NET strong motion data into peak ground motion values, and output in an
+        XML format.
+        Usage:
+        
+        '''
     parser = argparse.ArgumentParser(description='Download Japanese K-NET strong motion data for a selected event.')
-    parser.add_argument('-event',dest='eventID',help='Specify event ID (will search ShakeMap data directory.')
-    parser.add_argument('-utctime',dest='UTCTime',help='Specify UTC Time for event.',type=maketime)
-    parser.add_argument('-jptime',dest='JPTime',help='Specify Japanese Standard Time for event.',type=maketime)
-    parser.add_argument('-folder',dest='folder',help='Specify output station folder destination (defaults to event input folder or current working directory)',default=os.getcwd())
-    parser.add_argument('-user',dest='user',help='Specify user (defaults to value in config)')
-    parser.add_argument('-password',dest='password',help='Specify password (defaults to value in config)')
-    parser.add_argument('-keeptar',dest='keepTar',type=bool,default=False)
-    parser.add_argument('-plot',dest='doPlot',type=bool,default=False)
+    parser.add_argument('-c','-config',dest='doConfig',action='store_true',default=False,
+                        help='Create config file for future use')
+    parser.add_argument('-e','-event',dest='eventID',help='Specify event ID (will search ShakeMap data directory.')
+    parser.add_argument('-t','-utctime',dest='UTCTime',help='Specify UTC Time for event.',type=maketime)
+    parser.add_argument('-j','-jptime',dest='JPTime',help='Specify Japanese Standard Time for event.',type=maketime)
+    parser.add_argument('-f','-folder',dest='folder',help='Specify output station folder destination (defaults to event input folder or current working directory)',default=os.getcwd())
+    parser.add_argument('-u','-user',dest='user',help='Specify user (defaults to value in config)')
+    parser.add_argument('-p','-password',dest='password',help='Specify password (defaults to value in config)')
+    parser.add_argument('-k','-keep',dest='keepTar',action='store_true',default=False,
+                        help='Retain tarfile and extracted ASCII data files')
+    parser.add_argument('-o','-plot',dest='doPlot',action='store_true',default=False,
+                        help='Make QA plots')
     pargs = parser.parse_args()
     main(pargs,config)    
     
