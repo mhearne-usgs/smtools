@@ -1,5 +1,8 @@
 #!/usr/bin/env python
 
+import warnings
+warnings.filterwarnings("ignore")
+
 #stdlib imports
 import sys
 import os.path
@@ -8,8 +11,8 @@ from datetime import datetime
 #third party imports
 from obspy import read
 from obspy.signal.invsim import seisSim, cornFreq2Paz
-from neicio.tag import Tag
 from obspy.xseed.parser import Parser
+from neicio.tag import Tag
 import matplotlib.pyplot as plt
 from matplotlib import dates
 
@@ -96,7 +99,7 @@ def trace2xml(traces,parser,outfolder,doPlot=False):
         delta = trace.stats['sampling_rate']
         trace.detrend('simple')
         trace.detrend('demean')
-        trace.taper()
+        trace.taper(max_percentage=0.05, type='cosine')
         if parser is not None:
             trace.simulate(paz_remove=paz,remove_sensitivity=True,simulate_sensitivity=False)
         trace.filter('highpass',freq=FILTER_FREQ,zerophase=True,corners=CORNERS)
@@ -104,34 +107,35 @@ def trace2xml(traces,parser,outfolder,doPlot=False):
         trace.detrend('demean')
         
         #plot the acceleration (top) and velocity
-        plt.clf()
-        ax1 = plt.subplot(2,1,1)
-        atimes = trace.times()
-        atimes = [(trace.stats['starttime'] + t).datetime for t in atimes]
-        matimes = dates.date2num(atimes)
-        hfmt = dates.DateFormatter('%H:%M:%S')
-        plt.plot(matimes,trace.data)
-        ax1.xaxis.set_major_locator(dates.MinuteLocator())
-        ax1.xaxis.set_major_formatter(hfmt)
-        plt.title('Acceleration')
-        plt.ylabel('$m/s^2$')
-        #plt.xticks(rotation=-45)
+        if doPlot:
+            plt.clf()
+            ax1 = plt.subplot(2,1,1)
+            atimes = trace.times()
+            atimes = [(trace.stats['starttime'] + t).datetime for t in atimes]
+            matimes = dates.date2num(atimes)
+            hfmt = dates.DateFormatter('%H:%M:%S')
+            plt.plot(matimes,trace.data)
+            ax1.xaxis.set_major_locator(dates.MinuteLocator())
+            ax1.xaxis.set_major_formatter(hfmt)
+            plt.title('Acceleration')
+            plt.ylabel('$m/s^2$')
+    
         
         vtrace = trace.copy()
         vtrace.integrate() # vtrace now has velocity
         vtimes = vtrace.times()
         vtimes = [(trace.stats['starttime'] + t).datetime for t in vtimes]
         mvtimes = dates.date2num(vtimes)
-        ax2 = plt.subplot(2,1,2)
-        plt.plot(mvtimes,vtrace.data)
-        ax2.xaxis.set_major_locator(dates.MinuteLocator())
-        ax2.xaxis.set_major_formatter(hfmt)
-        plt.title('Velocity')
-        plt.ylabel('$m/s$')
-        #plt.xticks(rotation=-45)
-        pngfile = os.path.join(outfolder,'%s.png' % channel_id)
-        plt.savefig(pngfile)
-        plotfiles.append(pngfile)
+        if doPlot:
+            ax2 = plt.subplot(2,1,2)
+            plt.plot(mvtimes,vtrace.data)
+            ax2.xaxis.set_major_locator(dates.MinuteLocator())
+            ax2.xaxis.set_major_formatter(hfmt)
+            plt.title('Velocity')
+            plt.ylabel('$m/s$')
+            pngfile = os.path.join(outfolder,'%s.png' % channel_id)
+            plt.savefig(pngfile)
+            plotfiles.append(pngfile)
 
         # Get the Peak Ground Acceleration
         pga = abs(trace.max())
@@ -205,7 +209,7 @@ def trace2xml(traces,parser,outfolder,doPlot=False):
     outfile = os.path.join(outfolder,'%s_dat.xml' % net)
     print 'Saving to %s' % outfile
     stationlist_tag.renderToXML(filename=outfile,ntabs=1)
-    return (outfile,plotfiles)
+    return (outfile,plotfiles,stationlist_tag)
 
 if __name__ == '__main__':
     seedfile = sys.argv[1]
