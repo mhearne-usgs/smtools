@@ -12,12 +12,13 @@ This package depends on:
  * matplotlib, a Python 2D plotting library which produces publication quality figures. <a href="<a href="http://matplotlib.org/index.html">http://matplotlib.org/index.html</a>
  * scipy, a Python library which provides many user-friendly and efficient numerical routines such as routines for numerical integration and optimization. <a href="<a href="http://www.scipy.org/scipylib/index.html">http://www.scipy.org/scipylib/index.html</a>
  * obspy, a Python library for dealing with seismology data.
+ * neicio, a Python library for reading/writing various spatial data formats (including shakemap). 
 
 The best way to install numpy,matplotlib,and scipy is to use one of the Python distributions described here:
 
 <a href="http://www.scipy.org/install.html">http://www.scipy.org/install.html</a>
 
-Anaconda and Enthought distributions have been successfully tested with neicio.
+Anaconda and Enthought distributions have been successfully tested with smtools.
 
 Most of those distributions should include <em>pip</em>, a command line tool for installing and 
 managing Python packages.  You will use pip to install the other dependencies and libcomcat itself.  
@@ -28,6 +29,10 @@ are in your path.
 To install obspy:
 
 pip install obspy
+
+To install neicio:
+
+pip install git+git://github.com/usgs/neicio.git
 
 To install smtools:
 
