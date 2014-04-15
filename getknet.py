@@ -2,7 +2,8 @@
 
 #stdlib
 import warnings
-warnings.filterwarnings("ignore",message="oldnumeric")
+warnings.simplefilter("ignore", DeprecationWarning)
+import numpy.oldnumeric
 
 from xml.dom import minidom
 import ftplib
