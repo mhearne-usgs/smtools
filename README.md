@@ -21,7 +21,7 @@ The best way to install numpy,matplotlib,and scipy is to use one of the Python d
 Anaconda and Enthought distributions have been successfully tested with smtools.
 
 Most of those distributions should include <em>pip</em>, a command line tool for installing and 
-managing Python packages.  You will use pip to install the other dependencies and libcomcat itself.  
+managing Python packages.  You will use pip to install the other dependencies and smtools itself.  
  
 You may need to open a new terminal window to ensure that the newly installed versions of python and pip
 are in your path.
