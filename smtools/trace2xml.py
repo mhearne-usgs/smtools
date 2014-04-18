@@ -219,4 +219,4 @@ if __name__ == '__main__':
     for sacfile in sacfiles:
         stream = read(sacfile)
         traces.append(stream[0])
-    trace2xml(traces,parser,os.getcwd(),doPlot=True)
+    outfile,pltofiles,tag = trace2xml(traces,parser,os.getcwd(),doPlot=True)

@@ -5,9 +5,12 @@ from datetime import datetime
 import re
 import sys
 import os.path
+import tarfile
+import ftplib
 
 #local
 from trace2xml import trace2xml
+import util
 
 #third party
 from obspy.core.trace import Trace
@@ -18,6 +21,116 @@ import matplotlib.pyplot as plt
 
 TIMEFMT = '%Y/%m/%d %H:%M:%S'
 KNET_TRIGGER_DELAY = 15.0 #a delay in the KNet data logger - subtract this from "record time"
+JPTIMEOFF = 9 * 3600 #number of seconds offset from GMT for Japan Standard time
+
+def fetchKNet(user,password,jptime,timewindow):
+    url = FTPBASE.replace('[USER]',user)
+    url = url.replace('[PASSWORD]',password)
+    yearstr = '%4i' % jptime.year
+    monthstr = '%02i' % jptime.month
+    url = url.replace('[YEAR]',yearstr)
+    url = url.replace('[MONTH]',monthstr)
+    urlparts = urlparse.urlparse(url)
+    ftp = ftplib.FTP(urlparts.netloc)
+    ftp.login(user,password)
+    dirparts = urlparts.path.strip('/').split('/')
+    for d in dirparts:
+        try:
+            ftp.cwd(d)
+        except ftplib.error_perm,msg:
+            raise Exception,msg
+    ftpfiles = ftp.nlst()
+    localfile = None
+    for ftpfile in ftpfiles:
+        if not ftpfile.endswith('.gz'):
+            continue
+        year = int(ftpfile[0:4])
+        month = int(ftpfile[4:6])
+        day = int(ftpfile[6:8])
+        hour = int(ftpfile[8:10])
+        minute = int(ftpfile[10:12])
+        second = int(ftpfile[12:14])
+        tmptime = datetime(year,month,day,hour,minute,second)
+        if tmptime > jptime:
+            dt = tmptime - jptime
+        else:
+            dt = jptime - tmptime
+        nsecs = dt.days*86400 + dt.seconds
+        if nsecs > timewindow:
+            continue
+
+        localfile = os.path.join(os.getcwd(),ftpfile)
+        f = open(localfile,'wb')
+        ftp.retrbinary('RETR %s' % ftpfile,f.write)
+        f.close()
+        break
+    ftp.quit()
+    return localfile
+
+def extractDataFiles(tarfilename,tarfolder):
+    tarball = tarfile.open(name=tarfilename,mode='r:gz')
+    fnames = tarball.getnames()
+    datafiles = []
+    for fname in fnames:
+        if fname.endswith('.gz'):
+            continue
+        tarball.extract(fname,path=tarfolder)
+        datafiles.append(os.path.abspath(os.path.join(tarfolder,fname)))
+    tarball.close()
+    return datafiles
+
+def getDataFiles(args,config,outfolder,timewindow):
+    #There are three ways to specify the time of the desired earthquake
+    #By event id:
+    if args.folder:
+        tarfolder = args.folder
+    else:
+        tarfolder = os.getcwd()
+    if args.eventID:
+        eventfolder = os.path.join(config.get('SHAKEMAP','shakehome'),'data',args.eventID)
+        eventxml = os.path.join(eventfolder,'input','event.xml')
+        if not os.path.isfile(eventxml):
+            print 'Could not find an event.xml file at %s.  Returning.' % eventxml
+            sys.exit(1)
+        
+        if args.keep:
+            tarfolder = os.path.join(eventfolder,'raw')
+        else:
+            tarfolder = os.getcwd()
+            
+        utctime = util.parseEvent(eventxml)
+        jptime = utctime + timedelta(seconds=JPTIMEOFF)
+
+    #By UTC time
+    if args.UTCTime:
+        jptime = args.UTCTime + timedelta(seconds=JPTIMEOFF)
+
+    #There are two ways to specify username/password
+    #By explicitly passing them in or by reading the config file
+    if (args.user and not args.password) or (args.password and not args.user):
+        print 'You must specify both user and password, or neither.  Returning.'
+        sys.exit(1)
+        
+    if args.user:
+        user = args.user
+        password = args.password
+    else:
+        if config:
+            user = config.get('KNET','user')
+            password = config.get('KNET','password')
+        else:
+            print 'You did not specify user/password, and you do not have a config file.  Returning.'
+            sys.exit(1)
+            
+    #we now should have the user,password,jptime, and output filename.  This should be enough to find the event on
+    #the Japanese FTP site
+    tarfile = fetchKNet(user,password,jptime,timewindow)
+    if tarfile is None:
+        print 'No K-NET data was found within %i seconds of %s (JST).  Returning.' % (args.timeWindow,jptime)
+        sys.exit(1)
+
+    datafiles = extractDataFiles(tarfile,tarfolder)
+    return (tarfile,datafiles)
 
 def readheader(hdrlines):
     """

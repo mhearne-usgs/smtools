@@ -5,9 +5,6 @@ import warnings
 warnings.simplefilter("ignore", DeprecationWarning)
 import numpy.oldnumeric
 
-from xml.dom import minidom
-import ftplib
-import urlparse
 import sys
 import tarfile
 from datetime import datetime,timedelta
@@ -17,83 +14,15 @@ import argparse
 import glob
 
 #import local
-from smtools.knet import readknet
+from smtools import knet,geonet
 from smtools.trace2xml import trace2xml
 
 #constants
 FTPBASE = 'ftp://www.k-net.bosai.go.jp/knet/alldata/[YEAR]/[MONTH]'
 TIMEFMT = '%Y-%m-%dT%H:%M:%S'
-JPTIMEOFF = 9 * 3600 #number of seconds offset from GMT for Japan Standard time
 TIMEWINDOW = 60 #number of seconds within which to search for matching event on knet site
 
-def parseEvent(eventxml):
-    root = minidom.parse(eventxml)
-    eq = root.getElementsByTagName('earthquake')[0]
-    year = int(eq.getAttribute('year'))
-    month = int(eq.getAttribute('month'))
-    day = int(eq.getAttribute('day'))
-    hour = int(eq.getAttribute('hour'))
-    minute = int(eq.getAttribute('minute'))
-    second = int(eq.getAttribute('second'))
-    root.unlink()
-    utctime = datetime(year,month,day,hour,minute,second)
-    return utctime
 
-def extractDataFiles(tarfilename,tarfolder):
-    tarball = tarfile.open(name=tarfilename,mode='r:gz')
-    fnames = tarball.getnames()
-    datafiles = []
-    for fname in fnames:
-        if fname.endswith('.gz'):
-            continue
-        tarball.extract(fname,path=tarfolder)
-        datafiles.append(os.path.abspath(os.path.join(tarfolder,fname)))
-    tarball.close()
-    return datafiles
-
-def fetchKNet(user,password,jptime,timewindow):
-    url = FTPBASE.replace('[USER]',user)
-    url = url.replace('[PASSWORD]',password)
-    yearstr = '%4i' % jptime.year
-    monthstr = '%02i' % jptime.month
-    url = url.replace('[YEAR]',yearstr)
-    url = url.replace('[MONTH]',monthstr)
-    urlparts = urlparse.urlparse(url)
-    ftp = ftplib.FTP(urlparts.netloc)
-    ftp.login(user,password)
-    dirparts = urlparts.path.strip('/').split('/')
-    for d in dirparts:
-        try:
-            ftp.cwd(d)
-        except ftplib.error_perm,msg:
-            raise Exception,msg
-    ftpfiles = ftp.nlst()
-    localfile = None
-    for ftpfile in ftpfiles:
-        if not ftpfile.endswith('.gz'):
-            continue
-        year = int(ftpfile[0:4])
-        month = int(ftpfile[4:6])
-        day = int(ftpfile[6:8])
-        hour = int(ftpfile[8:10])
-        minute = int(ftpfile[10:12])
-        second = int(ftpfile[12:14])
-        tmptime = datetime(year,month,day,hour,minute,second)
-        if tmptime > jptime:
-            dt = tmptime - jptime
-        else:
-            dt = jptime - tmptime
-        nsecs = dt.days*86400 + dt.seconds
-        if nsecs > timewindow:
-            continue
-
-        localfile = os.path.join(os.getcwd(),ftpfile)
-        f = open(localfile,'wb')
-        ftp.retrbinary('RETR %s' % ftpfile,f.write)
-        f.close()
-        break
-    ftp.quit()
-    return localfile
 
 def maketime(timestring):
     outtime = None
@@ -105,7 +34,6 @@ def maketime(timestring):
         except:
             raise Exception,'Could not parse time or date from %s' % timestring
     return outtime
-
 
 def doConfig():
     shakehome = raw_input('Please specify the root folder where ShakeMap is installed: ')
@@ -141,64 +69,6 @@ def getOutFolder(args,config):
         else:
             outfolder = os.getcwd()
     return outfolder
-        
-def getDataFiles(args,config,outfolder,timewindow):
-    #There are three ways to specify the time of the desired earthquake
-    #By event id:
-    if args.folder:
-        tarfolder = args.folder
-    else:
-        tarfolder = os.getcwd()
-    if args.eventID:
-        eventfolder = os.path.join(config.get('SHAKEMAP','shakehome'),'data',args.eventID)
-        eventxml = os.path.join(eventfolder,'input','event.xml')
-        if not os.path.isfile(eventxml):
-            print 'Could not find an event.xml file at %s.  Returning.' % eventxml
-            sys.exit(1)
-        
-        if args.keep:
-            tarfolder = os.path.join(eventfolder,'raw')
-        else:
-            tarfolder = os.getcwd()
-            
-        utctime = parseEvent(eventxml)
-        jptime = utctime + timedelta(seconds=JPTIMEOFF)
-
-    #By UTC time
-    if args.UTCTime:
-        jptime = args.UTCTime + timedelta(seconds=JPTIMEOFF)
-
-    #By Japan standard time
-    if args.JPTime:
-        jptime = args.JPTime
-        utctime = jptime - timedelta(seconds=JPTIMEOFF)
-
-    #There are two ways to specify username/password
-    #By explicitly passing them in or by reading the config file
-    if (args.user and not args.password) or (args.password and not args.user):
-        print 'You must specify both user and password, or neither.  Returning.'
-        sys.exit(1)
-        
-    if args.user:
-        user = args.user
-        password = args.password
-    else:
-        if config:
-            user = config.get('KNET','user')
-            password = config.get('KNET','password')
-        else:
-            print 'You did not specify user/password, and you do not have a config file.  Returning.'
-            sys.exit(1)
-            
-    #we now should have the user,password,jptime, and output filename.  This should be enough to find the event on
-    #the Japanese FTP site
-    tarfile = fetchKNet(user,password,jptime,timewindow)
-    if tarfile is None:
-        print 'No K-NET data was found within %i seconds of %s (JST).  Returning.' % (args.timeWindow,jptime)
-        sys.exit(1)
-
-    datafiles = extractDataFiles(tarfile,tarfolder)
-    return (tarfile,datafiles)
 
 def printTag(tag):
     for stationtag in tag.getChildren('station'):
@@ -229,10 +99,19 @@ def main(args,config):
     #Get the output folder
     outfolder = getOutFolder(args,config)
 
-    tarfile = None
+    mytarfile = None
+    datafiles = []
     if not args.inputFolder:
-        sys.stderr.write('Fetching strong motion data from NIED...\n')
-        tarfile,datafiles = getDataFiles(args,config,outfolder,args.timeWindow)
+        if args.source == 'knet':
+            sys.stderr.write('Fetching strong motion data from NIED...\n')
+            mytarfile,datafiles = knet.getDataFiles(args,config,outfolder,args.timeWindow)
+        if args.source == 'geonet':
+            sys.stderr.write('Fetching strong motion data from GeoNet...\n')
+            datafiles = geonet.getDataFiles(args,config,outfolder,args.timeWindow)
+            mytarfile = None
+        else:
+            print 'You must specify a source for the strong motion data.'
+            sys.exit(1)
         sys.stderr.write('Retrieved %i files.\n' % len(datafiles))
     else:
         datafiles1 = glob.glob(os.path.join(args.inputFolder,'*.NS'))
@@ -242,7 +121,13 @@ def main(args,config):
     
     traces = []
     for dfile in datafiles:
-        trace,header = readknet(dfile)
+        if args.source == 'knet':
+            trace,header = knet.readknet(dfile)
+        elif args.source == 'geonet':
+            trace,header = geonet.readgeonet(dfile)
+        else:
+            print 'Source %s is not supported' % (args.source)
+            sys.exit(1)
         traces.append(trace)
 
     sys.stderr.write('Converting %i files to peak ground motion...\n' % len(datafiles))
@@ -253,8 +138,8 @@ def main(args,config):
             os.remove(pfile)
         printTag(tag)
     
-    if tarfile is not None:
-        os.remove(tarfile)
+    if mytarfile is not None:
+        os.remove(mytarfile)
     #if the user specified an input folder, but did not specify to keep, keep anyway
     if args.inputFolder:
         args.keeptar = True
@@ -305,7 +190,7 @@ if __name__ == '__main__':
                         help='print peak ground motions to the screen for debugging.')
     parser.add_argument('-e','-event',dest='eventID',help='Specify event ID (will search ShakeMap data directory.')
     parser.add_argument('-t','-utctime',dest='UTCTime',help='Specify UTC Time for event. (format YYYY-MM-DDTHH:MM:SS)',type=maketime)
-    parser.add_argument('-j','-jptime',dest='JPTime',help='Specify Japanese Standard Time for event.  (format YYYY-MM-DDTHH:MM:SS)',type=maketime)
+    parser.add_argument('-s','-source',dest='source',help='Specify strong motion data source.',choices=['knet','geonet'])
     parser.add_argument('-w','-window',dest='timeWindow',help='Specify time window for search (seconds) (default: %(default)s).',type=int,default=TIMEWINDOW)
     parser.add_argument('-f','-folder',dest='folder',help='Specify output station folder destination (defaults to event input folder or current working directory)')
     parser.add_argument('-u','-user',dest='user',help='Specify user (defaults to value in config)')
