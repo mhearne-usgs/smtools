@@ -49,6 +49,14 @@ To update:
 
 pip install -U git+git://github.com/mhearne-usgs/smtools.git
 
+TODO
+____
+ - Make strong motion source in getstrong a positional argument
+ - Check EQ location in first data file, as there may be events within 60 seconds of each other.
+ - Read all traces in GeoNet data files
+ - Create a getamps.py script that will retrieve peak ground motions from various sources.
+ - Update documentation
+
 Command line usage
 ------------------
 

@@ -158,8 +158,7 @@ if __name__ == '__main__':
     if os.path.isfile(configfile):
         config = ConfigParser()
         config.readfp(open(configfile))
-    desc = '''Download and process K-NET strong motion data into peak ground motion values, and output in an
-        XML format.
+        desc = '''Download and process strong motion data from different sources (NZ GeoNet, JP K-NET) into peak ground motion values, and output in an XML format.
         Usage:
         To configure the system for further use (you will be prompted for KNET username/password, and ShakeMap home):
         getknet.py -c
