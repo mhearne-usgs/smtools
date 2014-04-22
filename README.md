@@ -114,3 +114,17 @@ optional arguments:
   -o, -plot             Make QA plots
 </pre>
 
+<pre>
+usage: smcheck.py [-h] eventID dataFile
+
+Compare station data against a modeled ShakeMap.
+        
+
+positional arguments:
+  eventID     Specify event ID (will search ShakeMap data directory.
+  dataFile    Specify name of data file in event input folder to compare
+              against ShakeMap grid.
+
+optional arguments:
+  -h, --help  show this help message and exit
+</pre>
