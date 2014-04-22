@@ -20,9 +20,8 @@ from smtools.trace2xml import trace2xml
 #constants
 FTPBASE = 'ftp://www.k-net.bosai.go.jp/knet/alldata/[YEAR]/[MONTH]'
 TIMEFMT = '%Y-%m-%dT%H:%M:%S'
-TIMEWINDOW = 60 #number of seconds within which to search for matching event on knet site
-
-
+TIMEWINDOW = 60 #number of seconds within which to search for matching event on knet/geonet site
+DISTWINDOW = 50 #number of seconds within which to search for matching event on knet/geonet site
 
 def maketime(timestring):
     outtime = None
@@ -55,20 +54,24 @@ def doConfig():
     with open(configfile, 'wb') as configfile:
         config.write(configfile)
 
-def getOutFolder(args,config):
+def getOutFolders(args,config):
     #There are three ways to specify the time of the desired earthquake
     #By event id:
     if args.eventID:
         if not args.folder:
             outfolder = os.path.join(config.get('SHAKEMAP','shakehome'),'data',args.eventID,'input')
+            rawfolder = os.path.join(config.get('SHAKEMAP','shakehome'),'data',args.eventID,'raw')
         else:
             outfolder = args.folder
+            rawfolder = args.folder
     else:
         if args.folder:
             outfolder = args.folder
+            rawfolder = args.folder
         else:
             outfolder = os.getcwd()
-    return outfolder
+            rawfolder = outfolder
+    return (outfolder,rawfolder)
 
 def printTag(tag):
     for stationtag in tag.getChildren('station'):
@@ -97,23 +100,25 @@ def main(args,config):
         sys.exit(1)
 
     #Get the output folder
-    outfolder = getOutFolder(args,config)
+    outfolder,rawfolder = getOutFolders(args,config)
+    if not os.path.isdir(rawfolder):
+        os.makedirs(rawfolder)
 
     mytarfile = None
     datafiles = []
     if not args.inputFolder:
         if args.source == 'knet':
             sys.stderr.write('Fetching strong motion data from NIED...\n')
-            mytarfile,datafiles = knet.getDataFiles(args,config,outfolder,args.timeWindow)
+            mytarfile,datafiles = knet.getDataFiles(args,config,rawfolder,args.timeWindow)
         if args.source == 'geonet':
             sys.stderr.write('Fetching strong motion data from GeoNet...\n')
-            datafiles = geonet.getDataFiles(args,config,outfolder,args.timeWindow)
+            datafiles = geonet.getDataFiles(config,rawfolder,args.timeWindow,args.radius,eventid=args.eventID,eventtime=args.UTCTime)
             mytarfile = None
         else:
             print 'You must specify a source for the strong motion data.'
             sys.exit(1)
         sys.stderr.write('Retrieved %i files.\n' % len(datafiles))
-    else:
+    else: #this is specific to K-NET - fix!
         datafiles1 = glob.glob(os.path.join(args.inputFolder,'*.NS'))
         datafiles2 = glob.glob(os.path.join(args.inputFolder,'*.EW'))
         datafiles3 = glob.glob(os.path.join(args.inputFolder,'*.UD'))
@@ -123,12 +128,13 @@ def main(args,config):
     for dfile in datafiles:
         if args.source == 'knet':
             trace,header = knet.readknet(dfile)
+            traces.append(trace)
         elif args.source == 'geonet':
-            trace,header = geonet.readgeonet(dfile)
+            tracelist,headers = geonet.readgeonet(dfile)
+            traces = traces + tracelist
         else:
             print 'Source %s is not supported' % (args.source)
             sys.exit(1)
-        traces.append(trace)
 
     sys.stderr.write('Converting %i files to peak ground motion...\n' % len(datafiles))
     stationfile,plotfiles,tag = trace2xml(traces,None,outfolder,doPlot=args.doPlot)
@@ -181,15 +187,18 @@ if __name__ == '__main__':
         '''
     parser = argparse.ArgumentParser(description=desc,
                                      formatter_class=argparse.RawDescriptionHelpFormatter,)
+    parser.add_argument('source',help='Specify strong motion data source.',choices=['knet','geonet'])
     parser.add_argument('-c','-config',dest='doConfig',action='store_true',default=False,
                         help='Create config file for future use')
     parser.add_argument('-i','-inputfolder',dest='inputFolder',
                         help='process files from an input folder.')
     parser.add_argument('-d','-debug',dest='debug',action='store_true',default=False,
                         help='print peak ground motions to the screen for debugging.')
+    parser.add_argument('-r','-radius',dest='radius',default=DISTWINDOW,
+                        help='Specify distance window for search (seconds).')
     parser.add_argument('-e','-event',dest='eventID',help='Specify event ID (will search ShakeMap data directory.')
     parser.add_argument('-t','-utctime',dest='UTCTime',help='Specify UTC Time for event. (format YYYY-MM-DDTHH:MM:SS)',type=maketime)
-    parser.add_argument('-s','-source',dest='source',help='Specify strong motion data source.',choices=['knet','geonet'])
+    
     parser.add_argument('-w','-window',dest='timeWindow',help='Specify time window for search (seconds) (default: %(default)s).',type=int,default=TIMEWINDOW)
     parser.add_argument('-f','-folder',dest='folder',help='Specify output station folder destination (defaults to event input folder or current working directory)')
     parser.add_argument('-u','-user',dest='user',help='Specify user (defaults to value in config)')

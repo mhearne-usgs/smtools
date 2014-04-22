@@ -5,11 +5,12 @@ warnings.simplefilter("ignore", DeprecationWarning)
 import numpy.oldnumeric
 
 #stdlib imports
-from datetime import datetime
+from datetime import datetime,timedelta
 import sys
 import os.path
 import urlparse
 import ftplib
+import urllib2
 
 #local
 from trace2xml import trace2xml
@@ -19,22 +20,65 @@ import util
 from obspy.core.trace import Trace
 from obspy.core.trace import Stats
 from obspy.core.utcdatetime import UTCDateTime
+from obspy.core.util.geodetics import gps2DistAzimuth
 import numpy as np
 import matplotlib.pyplot as plt
 
-def getDataFiles(args,config,outfolder,timewindow):
-    GEOBASE = 'ftp://ftp.geonet.org.nz/strong/processed/Proc/[YEAR]/[MONTH]/'
-    if args.eventID:
-        eventfolder = os.path.join(config.get('SHAKEMAP','shakehome'),'data',args.eventID)
+CATBASE = 'http://quakesearch.geonet.org.nz/services/1.0.0/csv?startdate=[START]&enddate=[END]'
+GEOBASE = 'ftp://ftp.geonet.org.nz/strong/processed/Proc/[YEAR]/[MONTH]/'
+TIMEFMT = '%Y-%m-%dT%H:%M:%S'
+NZTIMEDELTA = 2 #number of seconds allowed between GeoNet catalog time and event timestamp on FTP site
+NZCATWINDOW = 5*60 #number of seconds to search around in GeoNet EQ catalog
+
+def checkCatalog(time,lat,lon,timewindow,distwindow):
+    stime = time - timedelta(seconds=NZCATWINDOW)
+    etime = time + timedelta(seconds=NZCATWINDOW)
+    url = CATBASE.replace('[START]',stime.strftime(TIMEFMT))
+    url = url.replace('[END]',etime.strftime(TIMEFMT))
+    try:
+        fh = urllib2.urlopen(url)
+        data = fh.read()
+        fh.close()
+        lines = data.split('\n')
+        for line in lines[1:]:
+            #time is column 2, longitude is column 4, latitude is column 5
+            parts = line.split(',')
+            eid = parts[0]
+            etime = datetime.strptime(parts[2][0:19],TIMEFMT)
+            elat = float(parts[5])
+            elon = float(parts[4])
+            if etime > time:
+                dt = etime - time
+            else:
+                dt = time - etime
+            nsecs = dt.days*86400 + dt.seconds
+            dd,az1,az2 = gps2DistAzimuth(lat,lon,elat,elon)
+            dd = dd/1000.0
+            if nsecs <= timewindow and dd < distwindow:
+                return (eid,etime)
+    except Exception,msg:
+        raise Exception,'Could not access the GeoNet website - got error "%s"' % str(msg)
+    return (None,None)
+
+def getDataFiles(config,outfolder,timewindow,distwindow,eventid=None,eventtime=None,lat=None,lon=None):
+    if eventid:
+        eventfolder = os.path.join(config.get('SHAKEMAP','shakehome'),'data',eventid)
         eventxml = os.path.join(eventfolder,'input','event.xml')
         if not os.path.isfile(eventxml):
             print 'Could not find an event.xml file at %s.  Returning.' % eventxml
             sys.exit(1)
-        utctime = util.parseEvent(eventxml)
+        utctime,lat,lon = util.parseEvent(eventxml)
     #By UTC time
-    if args.UTCTime:
-        utctime = args.UTCTime
+    if eventtime:
+        utctime = eventtime
 
+    #get the most likely event time and ID for the event we input
+    eid,gtime = checkCatalog(utctime,lat,lon,timewindow,distwindow)
+    if eid is None:
+        print 'Could not find this event in the GeoNet earthquake catalog.  Returning.'
+        sys.exit(1)
+    print 'This event is most likely the NZ event %s.' % eid
+        
     #set up the ftp url for this day and month
     #[MONTH] should be in the format mm_Mon (04_Apr, 05_May, etc.)
     neturl = GEOBASE.replace('[YEAR]',str(utctime.year))
@@ -52,43 +96,38 @@ def getDataFiles(args,config,outfolder,timewindow):
 
     #cd to the desired output folder
     os.chdir(outfolder)
-        
-    eventlist = ftp.nlst()
     datafiles = []
-    for fname in eventlist:
-        etime = datetime.strptime(fname,'%Y-%m-%d_%H%M%S')
-        if etime > utctime:
-            dt = etime - utctime
-        else:
-            dt = utctime - etime
-        nsecs = dt.days*86400 + dt.seconds
-        if nsecs > timewindow:
-            continue
-        try:
-            ftp.cwd(fname)
-        except:
-            pass
-        volumes = []
-        dirlist = ftp.nlst()
-        for volume in dirlist:
-            if volume.startswith('Vol'):
-                ftp.cwd(volume)
-                ftp.cwd('data')
-                flist = ftp.nlst()
-                for ftpfile in flist:
-                    if not ftpfile.endswith('V1A'):
-                        continue
-                    localfile = os.path.join(os.getcwd(),ftpfile)
-                    if localfile in datafiles:
-                        continue
-                    datafiles.append(localfile)
-                    f = open(localfile,'wb')
-                    sys.stderr.write('Retrieving remote file %s...\n' % ftpfile)
-                    ftp.retrbinary('RETR %s' % ftpfile,f.write)
-                    f.close()
-                ftp.cwd('..')
-                ftp.cwd('..')
-        ftp.cwd('..')
+
+    #create the event folder name from the time we got above
+    fname = gtime.strftime('%Y-%m-%d_%H%M%S')
+
+    try:
+        ftp.cwd(fname)
+    except:
+        print 'Could not find an FTP data folder called "%s". Returning.' % (urlparse.urljoin(neturl,fname))
+        sys.exit(1)
+        
+    volumes = []
+    dirlist = ftp.nlst()
+    for volume in dirlist:
+        if volume.startswith('Vol'):
+            ftp.cwd(volume)
+            ftp.cwd('data')
+            flist = ftp.nlst()
+            for ftpfile in flist:
+                if not ftpfile.endswith('V1A'):
+                    continue
+                localfile = os.path.join(os.getcwd(),ftpfile)
+                if localfile in datafiles:
+                    continue
+                datafiles.append(localfile)
+                f = open(localfile,'wb')
+                sys.stderr.write('Retrieving remote file %s...\n' % ftpfile)
+                ftp.retrbinary('RETR %s' % ftpfile,f.write)
+                f.close()
+            ftp.cwd('..')
+            ftp.cwd('..')
+
     ftp.quit()
     return datafiles
 
@@ -150,40 +189,47 @@ def readheader(lines):
     return hdrdict
     
 
-def readgeonet(geonetfile):
-    f = open(geonetfile,'rt')
+def readheaderlines(f):
     hdrlines = []
     for i in range(0,26):
         hdrlines.append(f.readline())
+    return hdrlines
 
-    hdrdict = readheader(hdrlines)
-    numlines = hdrdict['npts']/10
-    data = []
-    for i in range(0,numlines):
-        line = f.readline()
-        parts = line.strip().split()
-        mdata = [float(p) for p in parts]
-        data = data + mdata
+def readgeonet(geonetfile):
+    f = open(geonetfile,'rt')
+    tracelist = []
+    headerlist = []
+    hdrlines = readheaderlines(f)
+    while len(hdrlines[-1]):
+        hdrdict = readheader(hdrlines)
+        numlines = hdrdict['npts']/10
+        data = []
+        for i in range(0,numlines):
+            line = f.readline()
+            parts = line.strip().split()
+            mdata = [float(p) for p in parts]
+            data = data + mdata
+        data = np.array(data)
+        header = hdrdict.copy()
+        stats = Stats(hdrdict)
+        trace = Trace(data,header=stats)
+        #apply the calibration and convert from mm/s^2 to m/s^2
+        trace.data = trace.data * trace.stats['calib'] * 0.001 #convert to m/s^2
+        tracelist.append(trace.copy())
+        headerlist.append(header.copy())
+        hdrlines = readheaderlines(f)
+
     f.close()
-    
-    data = np.array(data)
-    header = hdrdict.copy()
-    stats = Stats(hdrdict)
-    trace = Trace(data,header=stats)
-
-    #apply the calibration and convert from mm/s^2 to m/s^2
-    trace.data = trace.data * trace.stats['calib'] * 0.001 #convert to m/s^2
-    
-    return (trace,header)
+    return (tracelist,headerlist)
 
 if __name__ == '__main__':
     geonetfile = sys.argv[1]
-    trace,header = readgeonet(geonetfile)
+    traces,headers = readgeonet(geonetfile)
     print trace.data.max()
     trace.detrend('demean')
     trace.plot()
     plt.savefig('geonet.png')
-    print trace.data.max()
-    print trace.stats['calib']
-    print trace.data.max() * trace.stats['calib']
-    stationfile,plotfiles,tag = trace2xml([trace],None,os.getcwd(),doPlot=True)
+    print traces[0].data.max()
+    print traces[0].stats['calib']
+    print traces[0].data.max() * trace.stats['calib']
+    stationfile,plotfiles,tag = trace2xml(traces,None,os.getcwd(),doPlot=True)

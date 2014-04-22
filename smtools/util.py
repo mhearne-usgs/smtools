@@ -10,6 +10,8 @@ def parseEvent(eventxml):
     hour = int(eq.getAttribute('hour'))
     minute = int(eq.getAttribute('minute'))
     second = int(eq.getAttribute('second'))
-    root.unlink()
     utctime = datetime(year,month,day,hour,minute,second)
-    return utctime
+    lat = float(eq.getAttribute('lat'))
+    lon = float(eq.getAttribute('lon'))
+    root.unlink()
+    return (utctime,lat,lon)

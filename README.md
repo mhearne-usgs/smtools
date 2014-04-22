@@ -1,3 +1,8 @@
+TODO
+____
+ - Create a getamps.py script that will retrieve peak ground motions from various sources.
+ - Test K-NET code with new combined getstrong script
+
 Introduction
 ------------
 
@@ -49,24 +54,16 @@ To update:
 
 pip install -U git+git://github.com/mhearne-usgs/smtools.git
 
-TODO
-____
- - Make strong motion source in getstrong a positional argument
- - Check EQ location in first data file, as there may be events within 60 seconds of each other.
- - Read all traces in GeoNet data files
- - Create a getamps.py script that will retrieve peak ground motions from various sources.
- - Update documentation
-
 Command line usage
 ------------------
 
 <pre>
-usage: getknet.py [-h] [-c] [-i INPUTFOLDER] [-d] [-e EVENTID] [-t UTCTIME]
-                  [-j JPTIME] [-w TIMEWINDOW] [-f FOLDER] [-u USER]
-                  [-p PASSWORD] [-k] [-o]
+usage: getstrong.py [-h] [-c] [-i INPUTFOLDER] [-d] [-r RADIUS] [-e EVENTID]
+                    [-t UTCTIME] [-w TIMEWINDOW] [-f FOLDER] [-u USER]
+                    [-p PASSWORD] [-k] [-o]
+                    {knet,geonet}
 
-Download and process K-NET strong motion data into peak ground motion values, and output in an
-        XML format.
+Download and process strong motion data from different sources (NZ GeoNet, JP K-NET) into peak ground motion values, and output in an XML format.
         Usage:
         To configure the system for further use (you will be prompted for KNET username/password, and ShakeMap home):
         getknet.py -c
@@ -88,20 +85,22 @@ Download and process K-NET strong motion data into peak ground motion values, an
         getknet.py -e EVENTID
         
 
+positional arguments:
+  {knet,geonet}         Specify strong motion data source.
+
 optional arguments:
   -h, --help            show this help message and exit
   -c, -config           Create config file for future use
   -i INPUTFOLDER, -inputfolder INPUTFOLDER
                         process files from an input folder.
   -d, -debug            print peak ground motions to the screen for debugging.
+  -r RADIUS, -radius RADIUS
+                        Specify distance window for search (seconds).
   -e EVENTID, -event EVENTID
                         Specify event ID (will search ShakeMap data directory.
   -t UTCTIME, -utctime UTCTIME
                         Specify UTC Time for event. (format YYYY-MM-
                         DDTHH:MM:SS)
-  -j JPTIME, -jptime JPTIME
-                        Specify Japanese Standard Time for event. (format
-                        YYYY-MM-DDTHH:MM:SS)
   -w TIMEWINDOW, -window TIMEWINDOW
                         Specify time window for search (seconds) (default:
                         60).

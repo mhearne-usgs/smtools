@@ -98,7 +98,7 @@ def getDataFiles(args,config,outfolder,timewindow):
         else:
             tarfolder = os.getcwd()
             
-        utctime = util.parseEvent(eventxml)
+        utctime,lat,lon = util.parseEvent(eventxml)
         jptime = utctime + timedelta(seconds=JPTIMEOFF)
 
     #By UTC time
