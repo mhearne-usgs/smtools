@@ -14,7 +14,7 @@ import argparse
 import glob
 
 #import local
-from smtools import knet,geonet
+from smtools import knet,geonet,turkey
 from smtools.trace2xml import trace2xml
 
 #constants
@@ -114,6 +114,10 @@ def main(args,config):
             sys.stderr.write('Fetching strong motion data from GeoNet...\n')
             datafiles = geonet.getDataFiles(config,rawfolder,args.timeWindow,args.radius,eventid=args.eventID,eventtime=args.UTCTime)
             mytarfile = None
+        if args.source == 'turkey':
+            sys.stderr.write('Fetching strong motion data from Turkey...\n')
+            datafiles = turkey.getDataFiles(config,rawfolder,args.timeWindow,args.radius,eventid=args.eventID,eventtime=args.UTCTime)
+            mytarfile = None
         else:
             print 'You must specify a source for the strong motion data.'
             sys.exit(1)
@@ -131,6 +135,9 @@ def main(args,config):
             traces.append(trace)
         elif args.source == 'geonet':
             tracelist,headers = geonet.readgeonet(dfile)
+            traces = traces + tracelist
+        elif args.source == 'turkey':
+            tracelist,headers = turkey.readturkey(dfile)
             traces = traces + tracelist
         else:
             print 'Source %s is not supported' % (args.source)
@@ -187,7 +194,7 @@ if __name__ == '__main__':
         '''
     parser = argparse.ArgumentParser(description=desc,
                                      formatter_class=argparse.RawDescriptionHelpFormatter,)
-    parser.add_argument('source',help='Specify strong motion data source.',choices=['knet','geonet'])
+    parser.add_argument('source',help='Specify strong motion data source.',choices=['knet','geonet','turkey'])
     parser.add_argument('-c','-config',dest='doConfig',action='store_true',default=False,
                         help='Create config file for future use')
     parser.add_argument('-i','-inputfolder',dest='inputFolder',
@@ -195,7 +202,7 @@ if __name__ == '__main__':
     parser.add_argument('-d','-debug',dest='debug',action='store_true',default=False,
                         help='print peak ground motions to the screen for debugging.')
     parser.add_argument('-r','-radius',dest='radius',default=DISTWINDOW,
-                        help='Specify distance window for search (seconds).')
+                        help='Specify distance window for search (km).')
     parser.add_argument('-e','-event',dest='eventID',help='Specify event ID (will search ShakeMap data directory.')
     parser.add_argument('-t','-utctime',dest='UTCTime',help='Specify UTC Time for event. (format YYYY-MM-DDTHH:MM:SS)',type=maketime)
     
