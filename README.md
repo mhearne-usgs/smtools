@@ -61,7 +61,7 @@ Command line usage
 usage: getstrong.py [-h] [-c] [-i INPUTFOLDER] [-d] [-r RADIUS] [-e EVENTID]
                     [-t UTCTIME] [-w TIMEWINDOW] [-f FOLDER] [-u USER]
                     [-p PASSWORD] [-k] [-o]
-                    {knet,geonet}
+                    {knet,geonet,turkey}
 
 Download and process strong motion data from different sources (NZ GeoNet, JP K-NET) into peak ground motion values, and output in an XML format.
         Usage:
@@ -86,7 +86,7 @@ Download and process strong motion data from different sources (NZ GeoNet, JP K-
         
 
 positional arguments:
-  {knet,geonet}         Specify strong motion data source.
+  {knet,geonet,turkey}  Specify strong motion data source.
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -95,7 +95,7 @@ optional arguments:
                         process files from an input folder.
   -d, -debug            print peak ground motions to the screen for debugging.
   -r RADIUS, -radius RADIUS
-                        Specify distance window for search (seconds).
+                        Specify distance window for search (km).
   -e EVENTID, -event EVENTID
                         Specify event ID (will search ShakeMap data directory.
   -t UTCTIME, -utctime UTCTIME
