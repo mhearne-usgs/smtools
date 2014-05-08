@@ -12,16 +12,36 @@ from ConfigParser import ConfigParser,RawConfigParser
 import os.path
 import argparse
 import glob
+import re
+import collections
 
 #import local
-from smtools import knet,geonet,turkey
+from smtools import knet,geonet,turkey,util
 from smtools.trace2xml import trace2xml
 
 #constants
-FTPBASE = 'ftp://www.k-net.bosai.go.jp/knet/alldata/[YEAR]/[MONTH]'
 TIMEFMT = '%Y-%m-%dT%H:%M:%S'
 TIMEWINDOW = 60 #number of seconds within which to search for matching event on knet/geonet site
 DISTWINDOW = 50 #number of seconds within which to search for matching event on knet/geonet site
+
+class ValidateParams(argparse.Action):
+    def __call__(self, parser, args, values, option_string=None):
+        # print '{n} {v} {o}'.format(n=args, v=values, o=option_string)
+        etimestr, latstr,lonstr = values
+        try:
+            etime = maketime(etimestr)
+        except Exception,instance:
+            raise ValueError('Invalid time string %s' % etimestr)
+        try:
+            lat = float(latstr)
+        except:
+            raise ValueError('Invalid latitude value %s' % latstr)
+        try:
+            lon = float(lonstr)
+        except:
+            raise ValueError('Invalid longitude value %s' % lonstr)
+        Params = collections.namedtuple('Params', ['time','lat','lon'])
+        setattr(args, self.dest, Params(etime,lat,lon))
 
 def maketime(timestring):
     outtime = None
@@ -104,29 +124,59 @@ def main(args,config):
     if not os.path.isdir(rawfolder):
         os.makedirs(rawfolder)
 
-    mytarfile = None
+    if args.eventID and (args.time or args.lat or args.lon):
+        print 'Supply EITHER eventID OR time,lat,lon - not both'
+        sys.exit(1)
+
+    if (args.user and not args.password) or (args.password and not args.user):
+        print 'You must supply both KNET username AND password'
+        sys.exit(1)
+        
+    if args.eventID:
+        eventfile = os.path.join(config.get('SHAKEMAP','shakehome'),args.eventID,'input','event.xml')
+        etime,lat,lon = util.parseEvent(eventfile)
+
+    if args.Params:
+        etime = args.Params.time
+        lat = args.Params.lat
+        lon = args.Params.lon
+        
     datafiles = []
     if not args.inputFolder:
         if args.source == 'knet':
+            if args.user:
+                user = config.get('KNET','user')
+                password = config.get('KNET','password')
             sys.stderr.write('Fetching strong motion data from NIED...\n')
-            mytarfile,datafiles = knet.getDataFiles(args,config,rawfolder,args.timeWindow)
-        if args.source == 'geonet':
+            fetcher = knet.KNETFetcher(user,password)
+        elif args.source == 'geonet':
             sys.stderr.write('Fetching strong motion data from GeoNet...\n')
-            datafiles = geonet.getDataFiles(config,rawfolder,args.timeWindow,args.radius,eventid=args.eventID,eventtime=args.UTCTime)
-            mytarfile = None
-        if args.source == 'turkey':
+            fetcher = geonet.GeonetFetcher()
+        elif args.source == 'turkey':
             sys.stderr.write('Fetching strong motion data from Turkey...\n')
-            datafiles = turkey.getDataFiles(config,rawfolder,args.timeWindow,args.radius,eventid=args.eventID,eventtime=args.UTCTime)
-            mytarfile = None
+            fetcher = turkey.GeonetFetcher()
         else:
             print 'You must specify a source for the strong motion data.'
             sys.exit(1)
+        datafiles = fetcher.fetch(lat,lon,etime,args.radius,args.timeWindow,rawfolder)
         sys.stderr.write('Retrieved %i files.\n' % len(datafiles))
-    else: #this is specific to K-NET - fix!
-        datafiles1 = glob.glob(os.path.join(args.inputFolder,'*.NS'))
-        datafiles2 = glob.glob(os.path.join(args.inputFolder,'*.EW'))
-        datafiles3 = glob.glob(os.path.join(args.inputFolder,'*.UD'))
-        datafiles = datafiles1+datafiles2+datafiles3
+    else: 
+        if args.source == 'knet':
+            datafiles1 = glob.glob(os.path.join(args.inputFolder,'*.NS'))
+            datafiles2 = glob.glob(os.path.join(args.inputFolder,'*.EW'))
+            datafiles3 = glob.glob(os.path.join(args.inputFolder,'*.UD'))
+            datafiles = datafiles1+datafiles2+datafiles3
+        elif args.source == 'geonet':
+            datafiles = glob.glob(os.path.join(args.inputFolder,'*.V1A'))
+        else: #turkey, for now
+            datafiles1 = glob.glob(os.path.join(args.inputFolder,'*.txt'))
+            datafiles = []
+            for d in datafiles:
+                dpath,dfile = os.path.split(d)
+                if re.match('[0-9]{4}',dfile) is not None:
+                    datafiles.append(d)
+            
+        
     
     traces = []
     for dfile in datafiles:
@@ -151,12 +201,8 @@ def main(args,config):
             os.remove(pfile)
         printTag(tag)
     
-    if mytarfile is not None:
-        os.remove(mytarfile)
     #if the user specified an input folder, but did not specify to keep, keep anyway
-    if args.inputFolder:
-        args.keeptar = True
-    if not args.keep:
+    if args.nuke:
         for dfile in datafiles:
             os.remove(dfile)
     else:
@@ -171,26 +217,33 @@ if __name__ == '__main__':
     if os.path.isfile(configfile):
         config = ConfigParser()
         config.readfp(open(configfile))
-        desc = '''Download and process strong motion data from different sources (NZ GeoNet, JP K-NET) into peak ground motion values, and output in an XML format.
-        Usage:
+        desc = '''Download and process strong motion data from different sources (NZ GeoNet, JP K-NET, Turkey) into peak ground motion values, and output in an XML format suitable for inclusion in ShakeMap.
+        Generic (non-ShakeMap) Usage:
         To configure the system for further use (you will be prompted for KNET username/password, and ShakeMap home):
-        getknet.py -c
-        To process data from a local folder (rather than downloading from K-NET):
-        getknet.py -i INPUTFOLDER -f OUTPUTFOLDER
+        getstrong.py -c
+        To process data from a local folder (rather than downloading from a remote source):
+        getstrong.py -i INPUTFOLDER -f OUTPUTFOLDER
         To process data from a local folder and print peak ground motions to the screen:
-        getknet.py -i INPUTFOLDER -d
-        To process data from an event at a particular UTC time, with a 75 second search window:
-        ./getknet.py -f ~/tmp/knet -d -t 2014-04-02T23:22:47 -k -w 60
+        getstrong.py -i INPUTFOLDER -d
+
+        To retrieve data from K-NET with a user-supplied K-NET username/password:
+        ./getstrong.py knet -f ~/tmp/knet -y 2014-05-04T20:18:24 34.862 139.312 -u fred -p SECRETPASSWD
+
+        To retrieve data from GeoNet:
+        ./getstrong.py geonet -f ~/tmp/knet -y 2014-01-20T02:52:44 40.660 175.814
+
+        To retrieve data from Turkey:
+        ./getstrong.py turkey -f ~/tmp/knet -y 2003-05-01T00:27:06 38.970 40.450
 
         ###############################################################
         For Shakemap Users:
-        To download data for an event into it's input folder, while retaining the raw data:
+        To download K-NET data for an event into it's input folder, while retaining the raw data:
         
-        getknet.py -e EVENTID -k
+        getstrong.py knet -e EVENTID
         
-        To download data for an event into it's input folder, while deleting the raw data:
+        To download K-NET data for an event into it's input folder, while deleting the raw data:
         
-        getknet.py -e EVENTID
+        getstrong.py knet -e EVENTID -n
         '''
     parser = argparse.ArgumentParser(description=desc,
                                      formatter_class=argparse.RawDescriptionHelpFormatter,)
@@ -204,14 +257,14 @@ if __name__ == '__main__':
     parser.add_argument('-r','-radius',dest='radius',default=DISTWINDOW,
                         help='Specify distance window for search (km).')
     parser.add_argument('-e','-event',dest='eventID',help='Specify event ID (will search ShakeMap data directory.')
-    parser.add_argument('-t','-utctime',dest='UTCTime',help='Specify UTC Time for event. (format YYYY-MM-DDTHH:MM:SS)',type=maketime)
-    
+    parser.add_argument('-y','-hypocenter',dest='Params',action=ValidateParams,nargs=3,metavar=('TIME','LAT','LON'),
+                        help='Specify UTC time, lat and lon. (time format YYYY-MM-DDTHH:MM:SS)')
     parser.add_argument('-w','-window',dest='timeWindow',help='Specify time window for search (seconds) (default: %(default)s).',type=int,default=TIMEWINDOW)
     parser.add_argument('-f','-folder',dest='folder',help='Specify output station folder destination (defaults to event input folder or current working directory)')
-    parser.add_argument('-u','-user',dest='user',help='Specify user (defaults to value in config)')
-    parser.add_argument('-p','-password',dest='password',help='Specify password (defaults to value in config)')
-    parser.add_argument('-k','-keep',dest='keep',action='store_true',default=False,
-                        help='Retain extracted ASCII K-NET data files')
+    parser.add_argument('-u','-user',dest='user',help='Specify K-NET user (defaults to value in config)')
+    parser.add_argument('-p','-password',dest='password',help='Specify K-NET password (defaults to value in config)')
+    parser.add_argument('-n','-nuke',dest='nuke',action='store_true',default=False,
+                        help='Do NOT retain extracted raw data files')
     parser.add_argument('-o','-plot',dest='doPlot',action='store_true',default=False,
                         help='Make QA plots')
     pargs = parser.parse_args()

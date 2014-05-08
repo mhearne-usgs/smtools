@@ -59,30 +59,37 @@ Command line usage
 
 <pre>
 usage: getstrong.py [-h] [-c] [-i INPUTFOLDER] [-d] [-r RADIUS] [-e EVENTID]
-                    [-t UTCTIME] [-w TIMEWINDOW] [-f FOLDER] [-u USER]
-                    [-p PASSWORD] [-k] [-o]
+                    [-y TIME LAT LON] [-w TIMEWINDOW] [-f FOLDER] [-u USER]
+                    [-p PASSWORD] [-n] [-o]
                     {knet,geonet,turkey}
 
-Download and process strong motion data from different sources (NZ GeoNet, JP K-NET) into peak ground motion values, and output in an XML format.
-        Usage:
+Download and process strong motion data from different sources (NZ GeoNet, JP K-NET, Turkey) into peak ground motion values, and output in an XML format suitable for inclusion in ShakeMap.
+        Generic (non-ShakeMap) Usage:
         To configure the system for further use (you will be prompted for KNET username/password, and ShakeMap home):
-        getknet.py -c
-        To process data from a local folder (rather than downloading from K-NET):
-        getknet.py -i INPUTFOLDER -f OUTPUTFOLDER
+        getstrong.py -c
+        To process data from a local folder (rather than downloading from a remote source):
+        getstrong.py -i INPUTFOLDER -f OUTPUTFOLDER
         To process data from a local folder and print peak ground motions to the screen:
-        getknet.py -i INPUTFOLDER -d
-        To process data from an event at a particular UTC time, with a 75 second search window:
-        ./getknet.py -f ~/tmp/knet -d -t 2014-04-02T23:22:47 -k -w 60
+        getstrong.py -i INPUTFOLDER -d
+
+        To retrieve data from K-NET with a user-supplied K-NET username/password:
+        ./getstrong.py knet -f ~/tmp/knet -y 2014-05-04T20:18:24 34.862 139.312 -u fred -p SECRETPASSWD
+
+        To retrieve data from GeoNet:
+        ./getstrong.py geonet -f ~/tmp/knet -y 2014-01-20T02:52:44 40.660 175.814
+
+        To retrieve data from Turkey:
+        ./getstrong.py turkey -f ~/tmp/knet -y 2003-05-01T00:27:06 38.970 40.450
 
         ###############################################################
         For Shakemap Users:
-        To download data for an event into it's input folder, while retaining the raw data:
+        To download K-NET data for an event into it's input folder, while retaining the raw data:
         
-        getknet.py -e EVENTID -k
+        getstrong.py knet -e EVENTID
         
-        To download data for an event into it's input folder, while deleting the raw data:
+        To download K-NET data for an event into it's input folder, while deleting the raw data:
         
-        getknet.py -e EVENTID
+        getstrong.py knet -e EVENTID -n
         
 
 positional arguments:
@@ -98,8 +105,8 @@ optional arguments:
                         Specify distance window for search (km).
   -e EVENTID, -event EVENTID
                         Specify event ID (will search ShakeMap data directory.
-  -t UTCTIME, -utctime UTCTIME
-                        Specify UTC Time for event. (format YYYY-MM-
+  -y TIME LAT LON, -hypocenter TIME LAT LON
+                        Specify UTC time, lat and lon. (time format YYYY-MM-
                         DDTHH:MM:SS)
   -w TIMEWINDOW, -window TIMEWINDOW
                         Specify time window for search (seconds) (default:
@@ -107,10 +114,10 @@ optional arguments:
   -f FOLDER, -folder FOLDER
                         Specify output station folder destination (defaults to
                         event input folder or current working directory)
-  -u USER, -user USER   Specify user (defaults to value in config)
+  -u USER, -user USER   Specify K-NET user (defaults to value in config)
   -p PASSWORD, -password PASSWORD
-                        Specify password (defaults to value in config)
-  -k, -keep             Retain extracted ASCII K-NET data files
+                        Specify K-NET password (defaults to value in config)
+  -n, -nuke             Do NOT retain extracted raw data files
   -o, -plot             Make QA plots
 </pre>
 
