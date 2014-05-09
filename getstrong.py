@@ -217,9 +217,15 @@ if __name__ == '__main__':
     if os.path.isfile(configfile):
         config = ConfigParser()
         config.readfp(open(configfile))
-        desc = '''Download and process strong motion data from different sources (NZ GeoNet, JP K-NET, Turkey) into peak ground motion values, and output in an XML format suitable for inclusion in ShakeMap.
+        desc = '''
+        Download and process strong motion data from different sources
+        (NZ GeoNet, JP K-NET, Turkey) into peak ground motion values,
+        and output in an XML format suitable for inclusion in
+        ShakeMap.
+        
         Generic (non-ShakeMap) Usage:
-        To configure the system for further use (you will be prompted for KNET username/password, and ShakeMap home):
+        To configure the system for further use (you will be prompted for 
+        KNET username/password, and ShakeMap home):
         getstrong.py -c
         To process data from a local folder (rather than downloading from a remote source):
         getstrong.py -i INPUTFOLDER -f OUTPUTFOLDER
@@ -227,13 +233,13 @@ if __name__ == '__main__':
         getstrong.py -i INPUTFOLDER -d
 
         To retrieve data from K-NET with a user-supplied K-NET username/password:
-        ./getstrong.py knet -f ~/tmp/knet -y 2014-05-04T20:18:24 34.862 139.312 -u fred -p SECRETPASSWD
+        getstrong.py knet -f ~/tmp/knet -y 2014-05-04T20:18:24 34.862 139.312 -u fred -p SECRETPASSWD
 
         To retrieve data from GeoNet:
-        ./getstrong.py geonet -f ~/tmp/knet -y 2014-01-20T02:52:44 40.660 175.814
+        getstrong.py geonet -f ~/tmp/knet -y 2014-01-20T02:52:44 40.660 175.814
 
         To retrieve data from Turkey:
-        ./getstrong.py turkey -f ~/tmp/knet -y 2003-05-01T00:27:06 38.970 40.450
+        getstrong.py turkey -f ~/tmp/knet -y 2003-05-01T00:27:06 38.970 40.450
 
         ###############################################################
         For Shakemap Users:

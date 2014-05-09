@@ -16,7 +16,7 @@ This package depends on:
  * matplotlib, a Python 2D plotting library which produces publication quality figures. <a href="<a href="http://matplotlib.org/index.html">http://matplotlib.org/index.html</a>
  * scipy, a Python library which provides many user-friendly and efficient numerical routines such as routines for numerical integration and optimization. <a href="<a href="http://www.scipy.org/scipylib/index.html">http://www.scipy.org/scipylib/index.html</a>
  * obspy, a Python library for dealing with seismology data.
- * neicio, a Python library for reading/writing various spatial data formats (including shakemap). 
+ * neicio, a Python library for reading/writing various spatial data formats (including ShakeMap grid.xml). 
 
 The best way to install numpy,matplotlib,and scipy is to use one of the Python distributions described here:
 
@@ -62,9 +62,14 @@ usage: getstrong.py [-h] [-c] [-i INPUTFOLDER] [-d] [-r RADIUS] [-e EVENTID]
                     [-p PASSWORD] [-n] [-o]
                     {knet,geonet,turkey}
 
-Download and process strong motion data from different sources (NZ GeoNet, JP K-NET, Turkey) into peak ground motion values, and output in an XML format suitable for inclusion in ShakeMap.
+        Download and process strong motion data from different sources
+        (NZ GeoNet, JP K-NET, Turkey) into peak ground motion values,
+        and output in an XML format suitable for inclusion in
+        ShakeMap.
+        
         Generic (non-ShakeMap) Usage:
-        To configure the system for further use (you will be prompted for KNET username/password, and ShakeMap home):
+        To configure the system for further use (you will be prompted for 
+        KNET username/password, and ShakeMap home):
         getstrong.py -c
         To process data from a local folder (rather than downloading from a remote source):
         getstrong.py -i INPUTFOLDER -f OUTPUTFOLDER
@@ -72,13 +77,13 @@ Download and process strong motion data from different sources (NZ GeoNet, JP K-
         getstrong.py -i INPUTFOLDER -d
 
         To retrieve data from K-NET with a user-supplied K-NET username/password:
-        ./getstrong.py knet -f ~/tmp/knet -y 2014-05-04T20:18:24 34.862 139.312 -u fred -p SECRETPASSWD
+        getstrong.py knet -f ~/tmp/knet -y 2014-05-04T20:18:24 34.862 139.312 -u fred -p SECRETPASSWD
 
         To retrieve data from GeoNet:
-        ./getstrong.py geonet -f ~/tmp/knet -y 2014-01-20T02:52:44 40.660 175.814
+        getstrong.py geonet -f ~/tmp/knet -y 2014-01-20T02:52:44 40.660 175.814
 
         To retrieve data from Turkey:
-        ./getstrong.py turkey -f ~/tmp/knet -y 2003-05-01T00:27:06 38.970 40.450
+        getstrong.py turkey -f ~/tmp/knet -y 2003-05-01T00:27:06 38.970 40.450
 
         ###############################################################
         For Shakemap Users:
