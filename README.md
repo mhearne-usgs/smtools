@@ -1,7 +1,6 @@
 TODO
 ____
  - Create a getamps.py script that will retrieve peak ground motions from various sources.
- - Test K-NET code with new combined getstrong script
 
 Introduction
 ------------
