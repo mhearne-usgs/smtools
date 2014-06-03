@@ -217,7 +217,7 @@ if __name__ == '__main__':
     if os.path.isfile(configfile):
         config = ConfigParser()
         config.readfp(open(configfile))
-        desc = '''
+    desc = '''
         Download and process strong motion data from different sources
         (NZ GeoNet, JP K-NET, Turkey) into peak ground motion values,
         and output in an XML format suitable for inclusion in
