@@ -124,7 +124,7 @@ def main(args,config):
     if not os.path.isdir(rawfolder):
         os.makedirs(rawfolder)
 
-    if args.eventID and (args.time or args.lat or args.lon):
+    if args.eventID and (hasattr(args,'time') or hasattr(args,'lat') or hasattr(args,'lon')):
         print 'Supply EITHER eventID OR time,lat,lon - not both'
         sys.exit(1)
 
@@ -261,7 +261,7 @@ if __name__ == '__main__':
     parser.add_argument('-d','-debug',dest='debug',action='store_true',default=False,
                         help='print peak ground motions to the screen for debugging.')
     parser.add_argument('-r','-radius',dest='radius',default=DISTWINDOW,
-                        help='Specify distance window for search (km).')
+                        help='Specify distance window for search (km)  (default: %(default)s km.)')
     parser.add_argument('-e','-event',dest='eventID',help='Specify event ID (will search ShakeMap data directory.')
     parser.add_argument('-y','-hypocenter',dest='Params',action=ValidateParams,nargs=3,metavar=('TIME','LAT','LON'),
                         help='Specify UTC time, lat and lon. (time format YYYY-MM-DDTHH:MM:SS)')
