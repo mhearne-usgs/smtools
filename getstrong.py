@@ -144,9 +144,12 @@ def main(args,config):
     datafiles = []
     if not args.inputFolder:
         if args.source == 'knet':
-            if args.user:
+            if not args.user:
                 user = config.get('KNET','user')
                 password = config.get('KNET','password')
+            else:
+                user = args.user
+                password = args.password
             sys.stderr.write('Fetching strong motion data from NIED...\n')
             fetcher = knet.KNETFetcher(user,password)
         elif args.source == 'geonet':
