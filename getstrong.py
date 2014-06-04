@@ -133,7 +133,7 @@ def main(args,config):
         sys.exit(1)
         
     if args.eventID:
-        eventfile = os.path.join(config.get('SHAKEMAP','shakehome'),args.eventID,'input','event.xml')
+        eventfile = os.path.join(config.get('SHAKEMAP','shakehome'),'data',args.eventID,'input','event.xml')
         etime,lat,lon = util.parseEvent(eventfile)
 
     if args.Params:
