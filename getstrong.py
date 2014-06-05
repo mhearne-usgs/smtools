@@ -157,7 +157,7 @@ def main(args,config):
             fetcher = geonet.GeonetFetcher()
         elif args.source == 'turkey':
             sys.stderr.write('Fetching strong motion data from Turkey...\n')
-            fetcher = turkey.GeonetFetcher()
+            fetcher = turkey.TurkeyFetcher()
         else:
             print 'You must specify a source for the strong motion data.'
             sys.exit(1)
@@ -197,7 +197,7 @@ def main(args,config):
             sys.exit(1)
 
     sys.stderr.write('Converting %i files to peak ground motion...\n' % len(datafiles))
-    stationfile,plotfiles,tag = trace2xml(traces,None,outfolder,doPlot=args.doPlot)
+    stationfile,plotfiles,tag = trace2xml(traces,None,outfolder,args.source,doPlot=args.doPlot)
     if args.debug:
         os.remove(stationfile)
         for pfile in plotfiles:
@@ -224,7 +224,8 @@ if __name__ == '__main__':
         Download and process strong motion data from different sources
         (NZ GeoNet, JP K-NET, Turkey) into peak ground motion values,
         and output in an XML format suitable for inclusion in
-        ShakeMap.
+        ShakeMap.  The output files will be named according to the
+        input data source: knet_dat.xml, geonet_dat.xml, etc.
         
         Generic (non-ShakeMap) Usage:
         To configure the system for further use (you will be prompted for 
@@ -246,13 +247,23 @@ if __name__ == '__main__':
 
         ###############################################################
         For Shakemap Users:
-        To download K-NET data for an event into it's input folder, while retaining the raw data:
+        To download K-NET data for an event into the event "input"
+        folder, while retaining the raw data in event "raw" folder:
         
         getstrong.py knet -e EVENTID
         
         To download K-NET data for an event into it's input folder, while deleting the raw data:
         
         getstrong.py knet -e EVENTID -n
+
+        To download data from Turkey:
+        getstrong.py turkey -e EVENTID
+
+        To download data from GeoNet:
+        getstrong.py getnet -e EVENTID
+
+
+        
         '''
     parser = argparse.ArgumentParser(description=desc,
                                      formatter_class=argparse.RawDescriptionHelpFormatter,)

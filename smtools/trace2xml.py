@@ -57,7 +57,7 @@ def smPSA(data, samp_rate):
 
     return out
 
-def trace2xml(traces,parser,outfolder,doPlot=False):
+def trace2xml(traces,parser,outfolder,source,doPlot=False):
     """
     Calibrate accelerometer data, derive peak ground motion values, and write a ShakeMap-compatible data file.
 
@@ -68,6 +68,7 @@ def trace2xml(traces,parser,outfolder,doPlot=False):
     @param traces - Sequence of ObsPy Trace objects, containing acceleration data in units of m/s^2.
     @param parser - ObsPy Parser object.  Can also be None, in which case calibration step is NOT performed, and station coordinates will have to be present in the input traces.
     @param outfolder - Path (string) where output data XML files and QA plots should be written.
+    @param source - Name of data source (knet, geonet, etc.)
     """
     if parser is not None:
         vdict = parser.getInventory()
@@ -206,7 +207,7 @@ def trace2xml(traces,parser,outfolder,doPlot=False):
 
     if not first_station:	# Add the final station to the list
         stationlist_tag.addChild(stationtag)
-    outfile = os.path.join(outfolder,'%s_dat.xml' % net)
+    outfile = os.path.join(outfolder,'%s_dat.xml' % source)
     print 'Saving to %s' % outfile
     stationlist_tag.renderToXML(filename=outfile,ntabs=1)
     return (outfile,plotfiles,stationlist_tag)
