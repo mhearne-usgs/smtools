@@ -195,22 +195,22 @@ def main(args,config):
         else:
             print 'Source %s is not supported' % (args.source)
             sys.exit(1)
+    if len(datafiles):
+        sys.stderr.write('Converting %i files to peak ground motion...\n' % len(datafiles))
+        stationfile,plotfiles,tag = trace2xml(traces,None,outfolder,args.source,doPlot=args.doPlot)
+        if args.debug:
+            os.remove(stationfile)
+            for pfile in plotfiles:
+                os.remove(pfile)
+            printTag(tag)
 
-    sys.stderr.write('Converting %i files to peak ground motion...\n' % len(datafiles))
-    stationfile,plotfiles,tag = trace2xml(traces,None,outfolder,args.source,doPlot=args.doPlot)
-    if args.debug:
-        os.remove(stationfile)
-        for pfile in plotfiles:
-            os.remove(pfile)
-        printTag(tag)
-    
-    #if the user specified an input folder, but did not specify to keep, keep anyway
-    if args.nuke:
-        for dfile in datafiles:
-            os.remove(dfile)
-    else:
-        if not args.debug:
-            sys.stderr.write('Wrote %i channels to data file %s\n' % (len(traces),stationfile))
+        #if the user specified an input folder, but did not specify to keep, keep anyway
+        if args.nuke:
+            for dfile in datafiles:
+                os.remove(dfile)
+        else:
+            if not args.debug:
+                sys.stderr.write('Wrote %i channels to data file %s\n' % (len(traces),stationfile))
     sys.exit(0)
 
 if __name__ == '__main__':

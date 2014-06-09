@@ -47,11 +47,18 @@ class TurkeyFetcher(StrongMotionFetcher):
     def fetch(self,lat,lon,etime,radius,timewindow,outfolder):
         utctime = etime
         htmldata = self.getSearchPage(utctime,lat,lon,radius)
+        if htmldata.lower().find("no records found") > -1:
+            msg = 'No records found in Turkey database.  Returning.'
+            print msg
+            datafiles = []
+            return datafiles
         xmldata = self.getSearchXML(htmldata)
         matchingEvent = self.getMatchingEvent(xmldata,utctime,lat,lon,timewindow,radius)
         if matchingEvent is None:
             msg = 'Failed to find matching event in Turkey database.  Returning.'
-            raise StrongMotionFetcherException(msg)
+            print msg
+            datafiles = []
+            return datafiles
 
         urlparts = urlparse.urlparse(URLBASE)
         url = urlparse.urljoin(urlparts.geturl(),matchingEvent['href'])
