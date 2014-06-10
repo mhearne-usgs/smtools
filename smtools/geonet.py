@@ -88,6 +88,8 @@ class GeonetFetcher(StrongMotionFetcher):
         dirlist = ftp.nlst()
         for volume in dirlist:
             if volume.startswith('Vol'):
+                if volume not in ftp.nlst():
+                    continue
                 ftp.cwd(volume)
                 if 'data' not in ftp.nlst():
                     continue
