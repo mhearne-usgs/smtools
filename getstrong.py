@@ -174,7 +174,7 @@ def main(args,config):
         else: #turkey, for now
             datafiles1 = glob.glob(os.path.join(args.inputFolder,'*.txt'))
             datafiles = []
-            for d in datafiles:
+            for d in datafiles1:
                 dpath,dfile = os.path.split(d)
                 if re.match('[0-9]{4}',dfile) is not None:
                     datafiles.append(d)
