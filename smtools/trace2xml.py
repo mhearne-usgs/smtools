@@ -98,13 +98,13 @@ def trace2xml(traces,parser,outfolder,netsource,doPlot=False):
                 continue
 
         delta = trace.stats['sampling_rate']
-        trace.detrend('simple')
+        trace.detrend('linear')
         trace.detrend('demean')
         trace.taper(max_percentage=0.05, type='cosine')
         if parser is not None:
             trace.simulate(paz_remove=paz,remove_sensitivity=True,simulate_sensitivity=False)
         trace.filter('highpass',freq=FILTER_FREQ,zerophase=True,corners=CORNERS)
-        trace.detrend('simple')
+        trace.detrend('linear')
         trace.detrend('demean')
         
         #plot the acceleration (top) and velocity
