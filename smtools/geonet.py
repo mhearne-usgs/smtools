@@ -88,15 +88,16 @@ class GeonetFetcher(StrongMotionFetcher):
         dirlist = ftp.nlst()
         for volume in dirlist:
             if volume.startswith('Vol'):
-                if volume not in ftp.nlst():
-                    continue
                 ftp.cwd(volume)
                 if 'data' not in ftp.nlst():
+                    ftp.cwd('..')
                     continue
+                
                 ftp.cwd('data')
                 flist = ftp.nlst()
                 for ftpfile in flist:
                     if not ftpfile.endswith('V1A'):
+                        
                         continue
                     localfile = os.path.join(os.getcwd(),ftpfile)
                     if localfile in datafiles:
@@ -215,10 +216,13 @@ def readgeonet(geonetfile):
     f = open(geonetfile,'rt')
     tracelist = []
     headerlist = []
-    hdrlines = readheaderlines(f)
+    try:
+        hdrlines = readheaderlines(f)
+    except:
+        pass
     while len(hdrlines[-1]):
         hdrdict = readheader(hdrlines)
-        numlines = hdrdict['npts']/10
+        numlines = int(np.ceil(hdrdict['npts']/10.0))
         data = []
         for i in range(0,numlines):
             line = f.readline()
