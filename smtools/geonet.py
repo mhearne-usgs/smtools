@@ -123,7 +123,12 @@ class GeonetFetcher(StrongMotionFetcher):
             data = fh.read()
             fh.close()
             lines = data.split('\n')
+            vectors = []
+            eidlist = []
+            etimelist = []
             for line in lines[1:]:
+                if not len(line.strip()):
+                    break
                 #time is column 2, longitude is column 4, latitude is column 5
                 parts = line.split(',')
                 eid = parts[0]
@@ -138,7 +143,12 @@ class GeonetFetcher(StrongMotionFetcher):
                 dd,az1,az2 = gps2DistAzimuth(lat,lon,elat,elon)
                 dd = dd/1000.0
                 if nsecs <= timewindow and dd < distwindow:
-                    return (eid,etime)
+                    vectors.append(np.sqrt(nsecs**2+dd**2))
+                    eidlist.append(eid)
+                    etimelist.append(etime)
+            if len(vectors):
+                idx = vectors.index(min(vectors))
+                return (eidlist[idx],etimelist[idx])
         except Exception,msg:
             raise Exception,'Could not access the GeoNet website - got error "%s"' % str(msg)
         return (None,None)
