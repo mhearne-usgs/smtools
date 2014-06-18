@@ -53,7 +53,7 @@ class KNETFetcher(StrongMotionFetcher):
         jptime = etime + timedelta(seconds=JPTIMEOFF)
         tarfile = self.fetchKNet(self.user,self.password,jptime,timewindow)
         if tarfile is None:
-            raise StrongMotionFetcherException('No K-NET data was found within %i seconds of %s (JST).  Returning.' % (args.timeWindow,jptime))
+            raise StrongMotionFetcherException('No K-NET data was found within %i seconds of %s (JST).  Returning.' % (timewindow,jptime))
         datafiles = self.extractDataFiles(tarfile,outfolder)
         os.remove(tarfile)
         return datafiles
