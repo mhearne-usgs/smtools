@@ -16,7 +16,7 @@ import re
 import collections
 
 #import local
-from smtools import knet,geonet,turkey,util
+from smtools import knet,geonet,turkey,iran,util
 from smtools.trace2xml import trace2xml
 
 #constants
@@ -158,8 +158,11 @@ def main(args,config):
         elif args.source == 'turkey':
             sys.stderr.write('Fetching strong motion data from Turkey...\n')
             fetcher = turkey.TurkeyFetcher()
+        elif args.source == 'iran':
+            print 'Automated downloading of Iran strong motion data is not supported.  Use the -i option instead.'
+            sys.exit(1)
         else:
-            print 'You must specify a source for the strong motion data.'
+            print 'Data source %s not supported.' % args.source
             sys.exit(1)
         datafiles = fetcher.fetch(lat,lon,etime,args.radius,args.timeWindow,rawfolder)
         sys.stderr.write('Retrieved %i files.\n' % len(datafiles))
@@ -171,14 +174,18 @@ def main(args,config):
             datafiles = datafiles1+datafiles2+datafiles3
         elif args.source == 'geonet':
             datafiles = glob.glob(os.path.join(args.inputFolder,'*.V1A'))
-        else: #turkey, for now
+        elif args.source == 'turkey':
             datafiles1 = glob.glob(os.path.join(args.inputFolder,'*.txt'))
             datafiles = []
             for d in datafiles1:
                 dpath,dfile = os.path.split(d)
                 if re.match('[0-9]{4}',dfile) is not None:
                     datafiles.append(d)
-            
+        elif args.source == 'iran':
+            datafiles = glob.glob(os.path.join(args.inputFolder,'*.V1'))
+        else:
+            print 'Data source %s not supported.' % args.source
+            sys.exit(1)
         
     
     traces = []
@@ -191,6 +198,9 @@ def main(args,config):
             traces = traces + tracelist
         elif args.source == 'turkey':
             tracelist,headers = turkey.readturkey(dfile)
+            traces = traces + tracelist
+        elif args.source == 'iran':
+            tracelist,headers = iran.readiran(dfile)
             traces = traces + tracelist
         else:
             print 'Source %s is not supported' % (args.source)
@@ -267,7 +277,7 @@ if __name__ == '__main__':
         '''
     parser = argparse.ArgumentParser(description=desc,
                                      formatter_class=argparse.RawDescriptionHelpFormatter,)
-    parser.add_argument('source',help='Specify strong motion data source.',choices=['knet','geonet','turkey'])
+    parser.add_argument('source',help='Specify strong motion data source.',choices=['knet','geonet','turkey','iran'])
     parser.add_argument('-c','-config',dest='doConfig',action='store_true',default=False,
                         help='Create config file for future use')
     parser.add_argument('-i','-inputfolder',dest='inputFolder',
