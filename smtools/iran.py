@@ -59,17 +59,17 @@ def readheader(lines):
     rotation = {parts2[0]:int(parts2[1]),parts2[2]:int(parts2[3])}
     hdrdict['rotation'] = rotation
 
-    #read the period
-    line = lines[9]
-    parts = line.split('=')
-    hdrdict['delta'] = float(re.search(FLOATRE,parts[1]).group())
+    #read the period and duration
+    line = lines[20]
+    parts = line.strip().split()
+    hdrdict['delta'] = float(parts[0])
     hdrdict['sampling_rate'] = 1/hdrdict['delta']
+    hdrdict['duration'] = float(parts[2])
 
     #read the number of points and duration
     line = lines[10]
     parts = line.split('=')
     hdrdict['npts'] = int(re.search(INTRE,parts[1].strip()).group())
-    hdrdict['duration'] = float(re.search(FLOATRE,parts[2].strip()).group())
 
     #read the channel (component)
     line = lines[6]
