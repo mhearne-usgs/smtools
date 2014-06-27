@@ -200,7 +200,10 @@ def main(args,config):
             tracelist,headers = turkey.readturkey(dfile)
             traces = traces + tracelist
         elif args.source == 'iran':
-            tracelist,headers = iran.readiran(dfile)
+            doRotation = True
+            if args.noRotation:
+                doRotation = False
+            tracelist,headers = iran.readiran(dfile,doRotation=doRotation)
             traces = traces + tracelist
         else:
             print 'Source %s is not supported' % (args.source)
@@ -297,6 +300,8 @@ if __name__ == '__main__':
                         help='Do NOT retain extracted raw data files')
     parser.add_argument('-o','-plot',dest='doPlot',action='store_true',default=False,
                         help='Make QA plots')
+    parser.add_argument('-q','--noRotation',dest='noRotation',action='store_true',default=False,
+                        help='Do NOT apply rotation to IRAN longitudinal/transverse channels')
     pargs = parser.parse_args()
     main(pargs,config)    
     
