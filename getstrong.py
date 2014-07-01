@@ -16,7 +16,7 @@ import re
 import collections
 
 #import local
-from smtools import knet,geonet,turkey,iran,util
+from smtools import knet,geonet,turkey,iran,iris,util
 from smtools.trace2xml import trace2xml
 
 #constants
@@ -161,6 +161,9 @@ def main(args,config):
         elif args.source == 'iran':
             print 'Automated downloading of Iran strong motion data is not supported.  Use the -i option instead.'
             sys.exit(1)
+        elif args.source == 'iris':
+            sys.stderr.write('Fetching strong motion and broadband data from IRIS...\n')
+            fetcher = iris.IrisFetcher() #will get strong motion AND broadband
         else:
             print 'Data source %s not supported.' % args.source
             sys.exit(1)
@@ -183,6 +186,8 @@ def main(args,config):
                     datafiles.append(d)
         elif args.source == 'iran':
             datafiles = glob.glob(os.path.join(args.inputFolder,'*.V1'))
+        elif args.source == 'iris':
+            datafiles = glob.glob(os.path.join(args.inputFolder,'*.pickle'))
         else:
             print 'Data source %s not supported.' % args.source
             sys.exit(1)
@@ -205,6 +210,9 @@ def main(args,config):
                 doRotation = False
             tracelist,headers = iran.readiran(dfile,doRotation=doRotation)
             traces = traces + tracelist
+        elif args.source == 'iris':
+            trace = iris.readiris(dfile)
+            traces.append(trace)
         else:
             print 'Source %s is not supported' % (args.source)
             sys.exit(1)
@@ -280,14 +288,14 @@ if __name__ == '__main__':
         '''
     parser = argparse.ArgumentParser(description=desc,
                                      formatter_class=argparse.RawDescriptionHelpFormatter,)
-    parser.add_argument('source',help='Specify strong motion data source.',choices=['knet','geonet','turkey','iran'])
+    parser.add_argument('source',help='Specify strong motion data source.',choices=['knet','geonet','turkey','iran','iris'])
     parser.add_argument('-c','-config',dest='doConfig',action='store_true',default=False,
                         help='Create config file for future use')
     parser.add_argument('-i','-inputfolder',dest='inputFolder',
                         help='process files from an input folder.')
     parser.add_argument('-d','-debug',dest='debug',action='store_true',default=False,
                         help='print peak ground motions to the screen for debugging.')
-    parser.add_argument('-r','-radius',dest='radius',default=DISTWINDOW,
+    parser.add_argument('-r','-radius',dest='radius',default=DISTWINDOW,type=float,
                         help='Specify distance window for search (km)  (default: %(default)s km.)')
     parser.add_argument('-e','-event',dest='eventID',help='Specify event ID (will search ShakeMap data directory.')
     parser.add_argument('-y','-hypocenter',dest='Params',action=ValidateParams,nargs=3,metavar=('TIME','LAT','LON'),

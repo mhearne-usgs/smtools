@@ -97,76 +97,95 @@ def trace2xml(traces,parser,outfolder,netsource,doPlot=False):
                 sys.stderr.write('Could not get station coordinates from trace object of station %s\n' % station)
                 continue
 
-        delta = trace.stats['sampling_rate']
-        trace.detrend('linear')
-        trace.detrend('demean')
-        trace.taper(max_percentage=0.05, type='cosine')
-        if parser is not None:
-            trace.simulate(paz_remove=paz,remove_sensitivity=True,simulate_sensitivity=False)
-        trace.filter('highpass',freq=FILTER_FREQ,zerophase=True,corners=CORNERS)
-        trace.detrend('linear')
-        trace.detrend('demean')
-        
-        #plot the acceleration (top) and velocity
+        #make the component tag to hold the measurements
+        comptag = Tag('comp',attributes={'name':channel})
+            
+        if not channel.startswith('B'):
+            delta = trace.stats['sampling_rate']
+            trace.detrend('linear')
+            trace.detrend('demean')
+            trace.taper(max_percentage=0.05, type='cosine')
+            if parser is not None:
+                trace.simulate(paz_remove=paz,remove_sensitivity=True,simulate_sensitivity=False)
+            trace.filter('highpass',freq=FILTER_FREQ,zerophase=True,corners=CORNERS)
+            trace.detrend('linear')
+            trace.detrend('demean')
+
+            # Get the Peak Ground Acceleration
+            pga = abs(trace.max())
+
+            (psa03, psa10, psa30) = smPSA(trace, delta)
+
+            #convert accelerations to %g
+            psa03 = psa03/0.0981
+            psa10 = psa10/0.0981
+            psa30 = psa30/0.0981
+            pga = pga/0.0981
+
+            #make the tags for the individual measurements, add them to comp tag
+            psa03tag = Tag('psa03',attributes={'value':psa03})
+            psa10tag = Tag('psa10',attributes={'value':psa10})
+            psa30tag = Tag('psa30',attributes={'value':psa30})
+            acctag = Tag('acc',attributes={'value':pga})
+
+            comptag.addChild(acctag)
+            comptag.addChild(psa03tag)
+            comptag.addChild(psa10tag)
+            comptag.addChild(psa30tag)
+            
+            #plot the acceleration (top) and velocity
+            if doPlot:
+                plt.clf()
+                ax1 = plt.subplot(2,1,1)
+                atimes = trace.times()
+                atimes = [(trace.stats['starttime'] + t).datetime for t in atimes]
+                matimes = dates.date2num(atimes)
+                hfmt = dates.DateFormatter('%H:%M:%S')
+                plt.plot(matimes,trace.data)
+                ax1.xaxis.set_major_locator(dates.MinuteLocator())
+                ax1.xaxis.set_major_formatter(hfmt)
+                plt.title('Acceleration %s' % channel_id)
+                plt.ylabel('$m/s^2$')
+                plt.xticks([])
+                #labels = ax1.get_xticklabels()
+                #ax1.set_xticklabels( labels, rotation=45 ) ;
+
+        if channel.startswith('B'): #don't integrate the broadband
+            vtimes = trace.times()
+            vtimes = [(trace.stats['starttime'] + t).datetime for t in vtimes]
+            mvtimes = dates.date2num(vtimes)
+            vtrace = trace.copy()
+        else:
+            vtrace = trace.copy()
+            vtrace.integrate() # vtrace now has velocity
+            vtimes = vtrace.times()
+            vtimes = [(vtrace.stats['starttime'] + t).datetime for t in vtimes]
+            mvtimes = dates.date2num(vtimes)
         if doPlot:
-            plt.clf()
-            ax1 = plt.subplot(2,1,1)
-            atimes = trace.times()
-            atimes = [(trace.stats['starttime'] + t).datetime for t in atimes]
-            matimes = dates.date2num(atimes)
-            hfmt = dates.DateFormatter('%H:%M:%S')
-            plt.plot(matimes,trace.data)
-            ax1.xaxis.set_major_locator(dates.MinuteLocator())
-            ax1.xaxis.set_major_formatter(hfmt)
-            plt.title('Acceleration')
-            plt.ylabel('$m/s^2$')
-    
-        
-        vtrace = trace.copy()
-        vtrace.integrate() # vtrace now has velocity
-        vtimes = vtrace.times()
-        vtimes = [(trace.stats['starttime'] + t).datetime for t in vtimes]
-        mvtimes = dates.date2num(vtimes)
-        if doPlot:
-            ax2 = plt.subplot(2,1,2)
+            if not channel.startswith('B'):
+                ax2 = plt.subplot(2,1,2)
+            else:
+                ax2 = plt.subplot(1,1,1)
             plt.plot(mvtimes,vtrace.data)
             ax2.xaxis.set_major_locator(dates.MinuteLocator())
             ax2.xaxis.set_major_formatter(hfmt)
-            plt.title('Velocity')
+            plt.title('Velocity %s' % channel_id)
             plt.ylabel('$m/s$')
+            plt.xticks(rotation=30)
             pngfile = os.path.join(outfolder,'%s.png' % channel_id)
             plt.savefig(pngfile)
             plotfiles.append(pngfile)
-
-        # Get the Peak Ground Acceleration
-        pga = abs(trace.max())
+            plt.close()
 
         # Get the Peak Ground Velocity
         pgv = abs(vtrace.max())
 
-        (psa03, psa10, psa30) = smPSA(trace, delta)
-
-        #convert accelerations to %g and velocity cm/s
-        psa03 = psa03/0.0981
-        psa10 = psa10/0.0981
-        psa30 = psa30/0.0981
-        pga = pga/0.0981
+        #convert velocity to cm/s
         pgv = pgv * 100
 
         #make the tags for the individual measurements
-        psa03tag = Tag('psa03',attributes={'value':psa03})
-        psa10tag = Tag('psa10',attributes={'value':psa10})
-        psa30tag = Tag('psa30',attributes={'value':psa30})
-        acctag = Tag('acc',attributes={'value':pga})
         veltag = Tag('vel',attributes={'value':pgv})
-
-        #make the component tag to hold the measurements
-        comptag = Tag('comp',attributes={'name':channel})
-        comptag.addChild(acctag)
         comptag.addChild(veltag)
-        comptag.addChild(psa03tag)
-        comptag.addChild(psa10tag)
-        comptag.addChild(psa30tag)
 
         code = '%s.%s' % (net,station)
         if current_tag == code:		# Same station: just add the comp tag
