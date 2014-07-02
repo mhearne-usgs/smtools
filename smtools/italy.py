@@ -31,7 +31,7 @@ HEADERS = {'STATION_CODE':'station',
            'LOCATION':'location',
            'NDATA':'npts',
            'DATA_TIME_FIRST_SAMPLE_YYYYMMDD_HHMMSS':'starttime',
-           'SAMPLING_INTERVAL_S':'sampling_rate',
+           'SAMPLING_INTERVAL_S':'delta',
            'STATION_LATITUDE_DEGREE':'lat',
            'STATION_LONGITUDE_DEGREE':'lon',
            'STATION_ELEVATION':'height',
@@ -60,11 +60,11 @@ def readitaly(datafile):
         hdrkey = HEADERS[key]
         if hdrkey == 'starttime':
             value = UTCDateTime(datetime.datetime.strptime(value,TIMEFMT))
-        if hdrkey not in ['station','channel','location','network']:
+        elif hdrkey not in ['station','channel','location','network']:
             value = float(value)
         hdrdict[hdrkey] = value
     f.close()
-    hdrdict['delta'] = 1/hdrdict['sampling_rate']
+    hdrdict['sampling_rate'] = 1/hdrdict['delta']
     hdrdict['endtime'] = hdrdict['starttime'] + hdrdict['duration']
     hdrdict['npts'] = int(hdrdict['npts'])
     hdrdict['calib'] = 1.0
