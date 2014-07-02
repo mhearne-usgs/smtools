@@ -79,6 +79,7 @@ def trace2xml(traces,parser,outfolder,netsource,doPlot=False):
     first_station = 1
     current_tag = ''
     plotfiles = []
+    hfmt = dates.DateFormatter('%H:%M:%S') #used for formatting dates in plots
     for trace in traces:
         net = trace.stats['network']
         station = trace.stats['station']
@@ -99,8 +100,9 @@ def trace2xml(traces,parser,outfolder,netsource,doPlot=False):
 
         #make the component tag to hold the measurements
         comptag = Tag('comp',attributes={'name':channel})
-            
-        if not channel.startswith('B'):
+        isAcc = channel.startswith('HL') or channel.startswith('HN') or channel.startswith('BN') or channel.startswith('VN')
+        isBroadband = not isAcc and channel.startswith('B')
+        if isAcc:
             delta = trace.stats['sampling_rate']
             trace.detrend('linear')
             trace.detrend('demean')
@@ -140,7 +142,6 @@ def trace2xml(traces,parser,outfolder,netsource,doPlot=False):
                 atimes = trace.times()
                 atimes = [(trace.stats['starttime'] + t).datetime for t in atimes]
                 matimes = dates.date2num(atimes)
-                hfmt = dates.DateFormatter('%H:%M:%S')
                 plt.plot(matimes,trace.data)
                 ax1.xaxis.set_major_locator(dates.MinuteLocator())
                 ax1.xaxis.set_major_formatter(hfmt)
@@ -150,7 +151,7 @@ def trace2xml(traces,parser,outfolder,netsource,doPlot=False):
                 #labels = ax1.get_xticklabels()
                 #ax1.set_xticklabels( labels, rotation=45 ) ;
 
-        if channel.startswith('B'): #don't integrate the broadband
+        if isBroadband: #don't integrate the broadband
             vtimes = trace.times()
             vtimes = [(trace.stats['starttime'] + t).datetime for t in vtimes]
             mvtimes = dates.date2num(vtimes)
@@ -162,7 +163,7 @@ def trace2xml(traces,parser,outfolder,netsource,doPlot=False):
             vtimes = [(vtrace.stats['starttime'] + t).datetime for t in vtimes]
             mvtimes = dates.date2num(vtimes)
         if doPlot:
-            if not channel.startswith('B'):
+            if isAcc:
                 ax2 = plt.subplot(2,1,2)
             else:
                 ax2 = plt.subplot(1,1,1)

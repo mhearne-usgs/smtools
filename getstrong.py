@@ -16,7 +16,7 @@ import re
 import collections
 
 #import local
-from smtools import knet,geonet,turkey,iran,iris,util
+from smtools import knet,geonet,turkey,iran,iris,italy,util
 from smtools.trace2xml import trace2xml
 
 #constants
@@ -163,7 +163,10 @@ def main(args,config):
             sys.exit(1)
         elif args.source == 'iris':
             sys.stderr.write('Fetching strong motion and broadband data from IRIS...\n')
-            fetcher = iris.IrisFetcher() #will get strong motion AND broadband
+            fetcher = iris.IrisFetcher(verbose=args.verbose) #will get strong motion AND broadband
+        elif args.source == 'italy':
+            print 'Automated downloading of Iran strong motion data is not supported.  Use the -i option instead.'
+            sys.exit(1)
         else:
             print 'Data source %s not supported.' % args.source
             sys.exit(1)
@@ -188,6 +191,8 @@ def main(args,config):
             datafiles = glob.glob(os.path.join(args.inputFolder,'*.V1'))
         elif args.source == 'iris':
             datafiles = glob.glob(os.path.join(args.inputFolder,'*.pickle'))
+        elif args.source == 'italy':
+            datafiles = glob.glob(os.path.join(args.inputFolder,'*DAT'))
         else:
             print 'Data source %s not supported.' % args.source
             sys.exit(1)
@@ -212,6 +217,9 @@ def main(args,config):
             traces = traces + tracelist
         elif args.source == 'iris':
             trace = iris.readiris(dfile)
+            traces.append(trace)
+        elif args.source == 'italy':
+            trace = italy.readitaly(dfile)
             traces.append(trace)
         else:
             print 'Source %s is not supported' % (args.source)
@@ -288,7 +296,7 @@ if __name__ == '__main__':
         '''
     parser = argparse.ArgumentParser(description=desc,
                                      formatter_class=argparse.RawDescriptionHelpFormatter,)
-    parser.add_argument('source',help='Specify strong motion data source.',choices=['knet','geonet','turkey','iran','iris'])
+    parser.add_argument('source',help='Specify strong motion data source.',choices=['knet','geonet','turkey','iran','iris','italy'])
     parser.add_argument('-c','-config',dest='doConfig',action='store_true',default=False,
                         help='Create config file for future use')
     parser.add_argument('-i','-inputfolder',dest='inputFolder',
@@ -310,6 +318,8 @@ if __name__ == '__main__':
                         help='Make QA plots')
     parser.add_argument('-q','--noRotation',dest='noRotation',action='store_true',default=False,
                         help='Do NOT apply rotation to IRAN longitudinal/transverse channels')
+    parser.add_argument('-v','--verbose',dest='verbose',action='store_true',default=False,
+                        help='Print out progress/warning messages')
     pargs = parser.parse_args()
     main(pargs,config)    
     

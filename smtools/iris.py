@@ -17,7 +17,7 @@ from obspy import UTCDateTime
 from obspy.core.util import geodetics
 
 #local imports
-from fetcher import StrongMotionFetcher,StrongMotionFetcherException,BroadBandFetcher,BroadBandFetcherException
+from fetcher import StrongMotionFetcher,StrongMotionFetcherException
 
 TIMEFMT = '%Y-%m-%dT%H:%M:%S'
 RADIUS = 3.6 #degrees within which to search for stations
@@ -40,8 +40,8 @@ def parseSAC(sacpz):
     return sacdict
 
 class IrisFetcher(StrongMotionFetcher):
-    def __init__(self):
-        pass
+    def __init__(self,verbose=False):
+        self.verbose = verbose
     
     def fetch(self,lat,lon,etime,radius,timewindow,outfolder):
         """
@@ -62,11 +62,14 @@ class IrisFetcher(StrongMotionFetcher):
         datafiles = []
         for channel in inventory.get_contents()['channels']:
             n,s,l,c = channel.split('.')
-            if c.startswith('H') or c.startswith('B'):
+            isAcc = c.startswith('HL') or c.startswith('HN') or c.startswith('BN') or c.startswith('VN')
+            isBroadband = not isAcc and c.startswith('B')
+            if isAcc or isBroadband:
                 try:
                     sacpz = irisclient.sacpz(n,s,l,c)
                 except Exception,msg:
-                    sys.stderr.write('Error retrieving coordinates for %s: "%s"\n' % (channel,str(msg)))
+                    if self.verbose:
+                        sys.stderr.write('Error retrieving coordinates for %s: "%s"\n' % (channel,str(msg)))
                     continue
                 sacdict = parseSAC(sacpz)
                 slat = float(sacdict['LATITUDE'])
@@ -82,22 +85,25 @@ class IrisFetcher(StrongMotionFetcher):
                 try:
                     st = client.get_waveforms(n,s,l,c, etime, endtime)
                 except Exception,msg:
-                    sys.stderr.write('Error retrieving waveforms for %s: "%s"\n' % (channel,str(msg)))
+                    if self.verbose:
+                        sys.stderr.write('Error retrieving waveforms for %s: "%s"\n' % (channel,str(msg)))
                     continue
-                sys.stderr.write('Retrieving data for station %s... %.1f km distance\n' % (channel,distance))
+                if self.verbose:
+                    sys.stderr.write('Retrieving data for station %s... %.1f km distance\n' % (channel,distance))
                 trace = st[0]
                 tf = NamedTemporaryFile()
                 respf = tf.name
                 try:
                     irisclient.resp(n,s,l,c,filename=respf)
                 except Exception,msg:
-                    sys.stderr.write('Error retrieving response information for channel %s: "%s"\n' % (channel,str(msg)))
+                    if self.verbose:
+                        sys.stderr.write('Error retrieving response information for channel %s: "%s"\n' % (channel,str(msg)))
                     continue
                 trace.stats['lat'] = slat
                 trace.stats['lon'] = slon
                 trace.stats['height'] = sheight
                 tf.close()
-                if c.startswith('H'):
+                if isAcc:
                     units = 'ACC'
                 else:
                     units = 'VEL'
@@ -110,7 +116,8 @@ class IrisFetcher(StrongMotionFetcher):
                 try:
                     trace.simulate(paz_remove=None,seedresp=seedresp) #now in m/s^2 or m/s
                 except Exception,msg:
-                    sys.stderr.write('Error calibrating channel %s: "%s"\n' % (channel,str(msg)))
+                    if self.verbose:
+                        sys.stderr.write('Error calibrating channel %s: "%s"\n' % (channel,str(msg)))
                     continue
 
                 #save as a Python pickle file since that preserves the lat/lon/height data
