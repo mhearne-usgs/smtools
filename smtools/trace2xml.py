@@ -109,7 +109,16 @@ def trace2xml(traces,parser,outfolder,netsource,doPlot=False):
             trace.taper(max_percentage=0.05, type='cosine')
             if parser is not None:
                 trace.simulate(paz_remove=paz,remove_sensitivity=True,simulate_sensitivity=False)
-            trace.filter('highpass',freq=FILTER_FREQ,zerophase=True,corners=CORNERS)
+            try:
+                trace.filter('highpass',freq=FILTER_FREQ,zerophase=True,corners=CORNERS)
+            except Exception,myexc:
+                estr = str(myexc)
+                if estr.lower().find('nyquist'):
+                    #Italian data, for example, has already been filtered, so trying a highpass filter
+                    #causes this exception: "Selected corner frequency is above Nyquist."
+                    pass
+                else:
+                    raise myexc
             trace.detrend('linear')
             trace.detrend('demean')
 
