@@ -20,39 +20,8 @@ from smtools import knet,geonet,turkey,iran,iris,italy,util
 from smtools.trace2xml import trace2xml
 
 #constants
-TIMEFMT = '%Y-%m-%dT%H:%M:%S'
 TIMEWINDOW = 60 #number of seconds within which to search for matching event on knet/geonet site
 DISTWINDOW = 50 #number of seconds within which to search for matching event on knet/geonet site
-
-class ValidateParams(argparse.Action):
-    def __call__(self, parser, args, values, option_string=None):
-        # print '{n} {v} {o}'.format(n=args, v=values, o=option_string)
-        etimestr, latstr,lonstr = values
-        try:
-            etime = maketime(etimestr)
-        except Exception,instance:
-            raise ValueError('Invalid time string %s' % etimestr)
-        try:
-            lat = float(latstr)
-        except:
-            raise ValueError('Invalid latitude value %s' % latstr)
-        try:
-            lon = float(lonstr)
-        except:
-            raise ValueError('Invalid longitude value %s' % lonstr)
-        Params = collections.namedtuple('Params', ['time','lat','lon'])
-        setattr(args, self.dest, Params(etime,lat,lon))
-
-def maketime(timestring):
-    outtime = None
-    try:
-        outtime = datetime.strptime(timestring,TIMEFMT)
-    except:
-        try:
-            outtime = datetime.strptime(timestring,DATEFMT)
-        except:
-            raise Exception,'Could not parse time or date from %s' % timestring
-    return outtime
 
 def doConfig():
     shakehome = raw_input('Please specify the root folder where ShakeMap is installed: ')
@@ -306,7 +275,7 @@ if __name__ == '__main__':
     parser.add_argument('-r','-radius',dest='radius',default=DISTWINDOW,type=float,
                         help='Specify distance window for search (km)  (default: %(default)s km.)')
     parser.add_argument('-e','-event',dest='eventID',help='Specify event ID (will search ShakeMap data directory.')
-    parser.add_argument('-y','-hypocenter',dest='Params',action=ValidateParams,nargs=3,metavar=('TIME','LAT','LON'),
+    parser.add_argument('-y','-hypocenter',dest='Params',action=util.ValidateParams,nargs=3,metavar=('TIME','LAT','LON'),
                         help='Specify UTC time, lat and lon. (time format YYYY-MM-DDTHH:MM:SS)')
     parser.add_argument('-w','-window',dest='timeWindow',help='Specify time window for search (seconds) (default: %(default)s).',type=int,default=TIMEWINDOW)
     parser.add_argument('-f','-folder',dest='folder',help='Specify output station folder destination (defaults to event input folder or current working directory)')
