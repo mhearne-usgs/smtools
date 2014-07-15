@@ -8,5 +8,5 @@ setup(name='smtools',
       url='',
       packages=['smtools'],
       install_requires=['numpy', 'matplotlib', 'scipy'],
-      scripts = ['getstrong.py','smcheck.py'],
+      scripts = ['getstrong.py','smcheck.py','getdyfi.py'],
 )
