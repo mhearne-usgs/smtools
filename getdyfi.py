@@ -87,19 +87,19 @@ def readCDI(cdifile):
     return locations
 
 def writeCDI(outname,stationlist):
-    stationlist_tag = Tag('stationlist',attributes={'created':datetime.utcnow().strftime('%s')})   
+    stationlist_tag = Tag('stationlist',attributes={'created':datetime.utcnow().strftime('%s')})
+    code = 0
     for station in stationlist:
-        # comptag = Tag('comp',attributes={'name':station['name']})
-        # cditag = Tag('mmi',attributes={'value':station['cdi']})
-        # comptag.addChild(cditag)
         stationtag = Tag('station',attributes={'name':station['name'],
                                                'netid':'DYFI',
                                                'insttype':'OBSERVED',
                                                'source':'USGS (Did You Feel It?)',
                                                'lat':station['lat'],'lon':station['lon'],
                                                'loc':station['name'],
+                                               'code':code,
                                                'intensity':'%.1f' % station['cdi']})
-        # stationtag.addChild(comptag)
+        code += 1        
+        
         stationlist_tag.addChild(stationtag)
     stationlist_tag.renderToXML(filename=outname,ntabs=1)
     
