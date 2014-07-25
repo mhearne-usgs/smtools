@@ -258,8 +258,8 @@ if __name__ == '__main__':
 
         ###############################################################
         For Shakemap Users:
-        To download K-NET data for an event into the event "input"
-        folder, while retaining the raw data in event "raw" folder:
+        To download K-NET data for an event into the event "input" 
+        folder (the -f option is unnecessary), while retaining the raw data in event "raw" folder:
         
         getstrong.py knet -e EVENTID
         
@@ -271,7 +271,24 @@ if __name__ == '__main__':
         getstrong.py turkey -e EVENTID
 
         To download data from GeoNet:
-        getstrong.py getnet -e EVENTID
+        getstrong.py geonet -e EVENTID
+        
+        To download data from IRIS:
+        getstrong.py iris -e EVENTID
+        
+        To download data from Iran:
+        download the files from "Digital Records," copy onto the Atlas machine
+        getstrong.py iran -e EVENTID -i PATH WHERE DATA IS LOCATED
+        
+        To download data from Mexico:
+        Select all boxes and download. Copy onto the atlas machine
+        getstrong.py unam -e EVENTID -i PATH WHERE DATA IS LOCATED
+        
+        To download data from Italy:
+        download ASCII corrected files. Copy onto atlas machine
+        getstrong.py italy -e EVENT ID -i PATH WHERE DATA IS LOCATED
+        
+        
 
 
         
