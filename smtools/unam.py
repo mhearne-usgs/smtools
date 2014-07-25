@@ -64,11 +64,15 @@ def readunam(unamfile):
         if line.startswith('COORDENADAS DE LA ESTACION'):
             latstr = re.search(FLOATMATCH,line.split(':')[1].strip()).group()
             hdrdict['lat'] = float(latstr)
+            if line.strip().endswith('S'):
+                hdrdict['lat'] = -hdrdict['lat']
             coordStart = True
             continue
         if coordStart:
             lonstr = re.search(FLOATMATCH,line.split(':')[1].strip()).group()
             hdrdict['lon'] = float(lonstr)
+            if line.strip().endswith('W'):
+                hdrdict['lon'] = -hdrdict['lon']
             coordStart = False
             continue
         if line.startswith('ALTITUD'):
