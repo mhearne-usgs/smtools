@@ -151,7 +151,7 @@ def trace2xml(traces,parser,outfolder,netsource,doPlot=False):
                 #labels = ax1.get_xticklabels()
                 #ax1.set_xticklabels( labels, rotation=45 ) ;
 
-        if trace.stats['units'] = 'vel': #don't integrate the broadband
+        if trace.stats['units'] == 'vel': #don't integrate the broadband
             vtimes = trace.times()
             vtimes = [(trace.stats['starttime'] + t).datetime for t in vtimes]
             mvtimes = dates.date2num(vtimes)
@@ -163,7 +163,7 @@ def trace2xml(traces,parser,outfolder,netsource,doPlot=False):
             vtimes = [(vtrace.stats['starttime'] + t).datetime for t in vtimes]
             mvtimes = dates.date2num(vtimes)
         if doPlot:
-            if trace.stats['units'] = 'acc':
+            if trace.stats['units'] == 'acc':
                 ax2 = plt.subplot(2,1,2)
             else:
                 ax2 = plt.subplot(1,1,1)
