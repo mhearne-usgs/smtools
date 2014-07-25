@@ -168,7 +168,7 @@ def main(args,config):
         elif args.source == 'unam':
             tdatafiles = glob.glob(os.path.join(args.inputFolder,'*')) #grab everything
             datafiles = []
-            for dfile in datafiles:
+            for dfile in tdatafiles:
                 fname,fext = os.path.splitext(dfile)
                 if re.match('[0-9]*',fext[1:]) is not None:
                     datafiles.append(dfile)
