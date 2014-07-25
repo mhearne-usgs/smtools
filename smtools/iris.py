@@ -111,7 +111,7 @@ class IrisFetcher(StrongMotionFetcher):
                              # Units to return response in ('DIS', 'VEL' or ACC)
                              'units': units
                              }
-
+                trace.stats['units'] = units.lower()
                 #apply the calibration
                 try:
                     trace.simulate(paz_remove=None,seedresp=seedresp) #now in m/s^2 or m/s

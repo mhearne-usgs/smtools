@@ -208,6 +208,7 @@ def readheader(lines):
     parts = line.strip().split()
     hdrdict['maxacc'] = float(parts[0])
     hdrdict['network'] = 'NZ'
+    hdrdict['units'] = 'acc'
     return hdrdict
     
 

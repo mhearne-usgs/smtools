@@ -79,6 +79,7 @@ def readheader(lines):
 
     hdrdict['calib'] = 1.0
     hdrdict['network'] = 'IR'
+    hdrdict['units'] = 'acc'
     return hdrdict
     
 

@@ -172,6 +172,7 @@ def readheader(hdrlines):
             parts = line.split()
             acc = float(parts[3])
             hdrdict['accmax'] = acc
+        hdrdict['units'] = 'acc' #this will be in all of the headers I read
     return hdrdict
 
 def readknet(knetfilename):

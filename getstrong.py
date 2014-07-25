@@ -16,7 +16,7 @@ import re
 import collections
 
 #import local
-from smtools import knet,geonet,turkey,iran,iris,italy,util
+from smtools import knet,geonet,turkey,iran,iris,italy,unam,util
 from smtools.trace2xml import trace2xml
 
 #constants
@@ -134,7 +134,10 @@ def main(args,config):
             sys.stderr.write('Fetching strong motion and broadband data from IRIS...\n')
             fetcher = iris.IrisFetcher(verbose=args.verbose) #will get strong motion AND broadband
         elif args.source == 'italy':
-            print 'Automated downloading of Iran strong motion data is not supported.  Use the -i option instead.'
+            print 'Automated downloading of Italian strong motion data is not supported.  Use the -i option instead.'
+            sys.exit(1)
+        elif args.source == 'unam':
+            print 'Automated downloading of Mexican (UNAM) strong motion data is not supported.  Use the -i option instead.'
             sys.exit(1)
         else:
             print 'Data source %s not supported.' % args.source
@@ -162,6 +165,13 @@ def main(args,config):
             datafiles = glob.glob(os.path.join(args.inputFolder,'*.pickle'))
         elif args.source == 'italy':
             datafiles = glob.glob(os.path.join(args.inputFolder,'*DAT'))
+        elif args.source == 'unam':
+            tdatafiles = glob.glob(os.path.join(args.inputFolder,'*')) #grab everything
+            datafiles = []
+            for dfile in datafiles:
+                fname,fext = os.path.splitext(dfile)
+                if re.match('[0-9]*',fext[1:]) is not None:
+                    datafiles.append(dfile)
         else:
             print 'Data source %s not supported.' % args.source
             sys.exit(1)
@@ -190,6 +200,9 @@ def main(args,config):
         elif args.source == 'italy':
             trace = italy.readitaly(dfile)
             traces.append(trace)
+        elif args.source == 'unam':
+            tracelist,headers = unam.readunam(dfile)
+            traces = traces + tracelist
         else:
             print 'Source %s is not supported' % (args.source)
             sys.exit(1)
@@ -265,7 +278,7 @@ if __name__ == '__main__':
         '''
     parser = argparse.ArgumentParser(description=desc,
                                      formatter_class=argparse.RawDescriptionHelpFormatter,)
-    parser.add_argument('source',help='Specify strong motion data source.',choices=['knet','geonet','turkey','iran','iris','italy'])
+    parser.add_argument('source',help='Specify strong motion data source.',choices=['knet','geonet','turkey','iran','iris','italy','unam'])
     parser.add_argument('-c','-config',dest='doConfig',action='store_true',default=False,
                         help='Create config file for future use')
     parser.add_argument('-i','-inputfolder',dest='inputFolder',

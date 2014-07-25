@@ -68,6 +68,7 @@ def readitaly(datafile):
     hdrdict['endtime'] = hdrdict['starttime'] + hdrdict['duration']
     hdrdict['npts'] = int(hdrdict['npts'])
     hdrdict['calib'] = 1.0
+    hdrdict['units'] = 'acc'
     data = np.array(data)
     header = hdrdict.copy()
     stats = Stats(hdrdict)

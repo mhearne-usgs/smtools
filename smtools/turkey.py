@@ -304,6 +304,7 @@ def readturkey(turkeyfile):
     ewchannel = np.array(ewchannel)
     udchannel = np.array(udchannel)
     header['network'] = 'TR'
+    header['units'] = 'acc'
     nsheader = header.copy()
     nsheader['channel'] = 'NS'
     ewheader = header.copy()
