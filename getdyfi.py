@@ -25,11 +25,11 @@ def fetchCDIByParams(etime,lat,lon,config,rawfolder):
     eventlist = comcat.associate({'lat':lat,'lon':lon,'time':etime})
     if len(eventlist) == 0:
         msg = 'Could not find any events within %.1f km and %i seconds of event at %s (%.3f,%.3f)'
-        print msg % (DISTWINDOW,TIMEWINDOW,etime,lat,lon)
+        print msg % (comcat.DISTWINDOW,comcat.TIMEWINDOW,etime,lat,lon)
         sys.exit(1)
     if len(eventlist) > 1:
         msg = 'Found multiple events within %.1f km and %i seconds of event at %s (%.3f,%.3f).  Exiting.'
-        print msg % (DISTWINDOW,TIMEWINDOW,etime,lat,lon)
+        print msg % (comcat.DISTWINDOW,comcat.TIMEWINDOW,etime,lat,lon)
         sys.exit(1)
     url = EVENTURL.replace('[EVENTID]',eventlist[0]['id'])
     req = urllib2.Request(url)
