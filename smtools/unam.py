@@ -76,7 +76,10 @@ def readunam(unamfile):
             coordStart = False
             continue
         if line.startswith('ALTITUD'):
-            hdrdict['height'] = float(line.split(':')[1].strip())
+            try:
+                hdrdict['height'] = float(line.split(':')[1].strip())
+            except:
+                hdrdict['height'] = 0.0
             continue
         if line.startswith('INTERVALO DE MUESTREO, C1-C6'):
             intstr = line.split(':')[1].strip().lstrip('/')
@@ -98,7 +101,10 @@ def readunam(unamfile):
                 pass
             continue
         if dataBlockCount == 2:
-            data.append([float(d) for d in line.split()])
+            row = [float(d) for d in line.split()]
+            if len(row) != len(channels):
+                row = np.zeros((1,len(channels))).tolist()[0]
+            data.append(row)
     f.close()
     hdrdict['network'] = 'MX'
     hdrdict['units'] = 'acc'

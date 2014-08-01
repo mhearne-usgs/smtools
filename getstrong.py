@@ -170,7 +170,7 @@ def main(args,config):
             datafiles = []
             for dfile in tdatafiles:
                 fname,fext = os.path.splitext(dfile)
-                if re.match('[0-9]*',fext[1:]) is not None:
+                if re.match('\d',fext[1:]) is not None:
                     datafiles.append(dfile)
         else:
             print 'Data source %s not supported.' % args.source
