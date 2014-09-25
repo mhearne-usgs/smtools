@@ -2,7 +2,7 @@
 
 import warnings
 warnings.simplefilter("ignore", DeprecationWarning)
-import numpy.oldnumeric
+#import numpy.oldnumeric
 
 #stdlib
 import os.path

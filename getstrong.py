@@ -3,7 +3,7 @@
 #stdlib
 import warnings
 warnings.simplefilter("ignore", DeprecationWarning)
-import numpy.oldnumeric
+#import numpy.oldnumeric
 
 import sys
 import tarfile
