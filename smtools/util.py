@@ -32,6 +32,26 @@ def parseEvent(eventxml):
     root.unlink()
     return (utctime,lat,lon)
 
+def readStationData(xmlfile):
+    root = minidom.parse(xmlfile)
+    stations = root.getElementsByTagName('station')
+    stationlist = []
+    for i in range(0,len(stations)):
+        station = stations[i]
+        lat = float(station.getAttribute('lat'))
+        lon = float(station.getAttribute('lon'))
+        comps = station.getElementsByTagName('comp')
+        compdict = {}
+        for comp in comps:
+            for child in comp.childNodes:
+                if child.nodeName.find('text') > -1:
+                    continue
+                key = child.nodeName
+                value = float(child.getAttribute('value'))
+                compdict[key] = value
+        stationlist.append({'lat':lat,'lon':lon,'components':compdict.copy()})
+    root.unlink()
+    return stationlist
 
 class ValidateParams(argparse.Action):
     """
