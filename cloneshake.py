@@ -239,10 +239,22 @@ def main(shakeurl):
     
     eventdict = getEventInfo(gridurl)
     writeEvent(gmpe,ipe,gmice,vs30,faulturl,stationurl,eventdict,shakehome)
+    print 'Cloning completed.\nTo run this event, do:\n%s/bin/shake -event %s' % (shakehome,eventdict['id'])
     
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Clone a ShakeMap from NEIC web site.')
+    desc = '''Clone a ShakeMap from NEIC web site.
+    
+Examples:
+
+    Cloning a scenario:
+    %(prog)s http://earthquake.usgs.gov/earthquakes/shakemap/global/shake/capstone2014_nmsw_m7.7_se/
+
+    Cloning a real-time event:
+    %(prog)s http://comcat.cr.usgs.gov/earthquakes/eventpage/usb000slwn#summary
+    '''
+    parser = argparse.ArgumentParser(description=desc,
+                                     formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('url', help='the URL of the desired ShakeMap.')
     args = parser.parse_args()
     if not args.url:

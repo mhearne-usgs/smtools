@@ -147,6 +147,15 @@ optional arguments:
 usage: cloneshake.py [-h] url
 
 Clone a ShakeMap from NEIC web site.
+    
+Examples:
+
+    Cloning a scenario:
+    cloneshake.py http://earthquake.usgs.gov/earthquakes/shakemap/global/shake/capstone2014_nmsw_m7.7_se/
+
+    Cloning a real-time event:
+    cloneshake.py http://comcat.cr.usgs.gov/earthquakes/eventpage/usb000slwn#summary
+    
 
 positional arguments:
   url         the URL of the desired ShakeMap.
