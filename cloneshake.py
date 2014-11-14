@@ -38,7 +38,7 @@ EVENT_TEMPLATE = '''<?xml version="1.0" encoding="US-ASCII" standalone="yes"?>
   created       CDATA   #REQUIRED
 >
 ]>
-<earthquake id="[ID]" lat="[LAT]" lon="[LON]" mag="[MAG]" year="[YEAR]" month="[MONTH]" day="[DAY]" hour="[HOUR]" minute="[MINUTE]" second="[SECOND]" timezone="GMT" depth="[DEPTH]" locstring="[LOCSTRING]" created="[CREATED]" type="SCENARIO" network="us" />'''
+<earthquake id="[ID]" lat="[LAT]" lon="[LON]" mag="[MAG]" year="[YEAR]" month="[MONTH]" day="[DAY]" hour="[HOUR]" minute="[MINUTE]" second="[SECOND]" timezone="GMT" depth="[DEPTH]" locstring="[LOCSTRING]" created="[CREATED]" network="us" />'''
 
 GRIND_TEMPLATE = '''smVs30default : VS30DEFAULT
 bad_station : 8016 9.9 19990101-
