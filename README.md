@@ -6,7 +6,10 @@ Introduction
 ------------
 
 smtools is a library and a set of tools for downloading, calibrating, and converting earthquake strong motion
-sensor data to peak ground motions, in a format suitable as input for the ShakeMap program.
+sensor data to peak ground motions, in a format suitable as input for the ShakeMap program.  It also provides a 
+script to "clone" a (modern*) ShakeMap from the USGS web site.
+
+*The ShakeMap must provide an info.xml file, which older versions of the ShakeMap software did not create.
 
 Installation and Dependencies
 -----------------------------
@@ -135,6 +138,18 @@ positional arguments:
   eventID     Specify event ID (will search ShakeMap data directory.
   dataFile    Specify name of data file in event input folder to compare
               against ShakeMap grid.
+
+optional arguments:
+  -h, --help  show this help message and exit
+</pre>
+
+<pre>
+usage: cloneshake.py [-h] url
+
+Clone a ShakeMap from NEIC web site.
+
+positional arguments:
+  url         the URL of the desired ShakeMap.
 
 optional arguments:
   -h, --help  show this help message and exit
