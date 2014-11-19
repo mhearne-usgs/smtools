@@ -39,7 +39,12 @@ def readheader(lines):
     #read the origin/start time
     line = lines[2]
     parts = line.split()
-    hdrdict['starttime'] = UTCDateTime(datetime.strptime(parts[3]+' '+parts[4],INTIMEFMT))
+    try:
+        datestr = re.search('[0-9]{4}/[0-9]{2}/[0-9]{2}',line).group()
+        timestr = re.search('[0-9]{2}:[0-9]{2}:[0-9]{2}',line).group()
+        hdrdict['starttime'] = UTCDateTime(datetime.strptime(datestr+' '+timestr,INTIMEFMT))
+    except:
+        pass
 
     #read the location information and station lat/lon
     line = lines[7]
