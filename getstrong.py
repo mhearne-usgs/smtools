@@ -129,6 +129,7 @@ def main(args,config):
             fetcher = turkey.TurkeyFetcher()
         elif args.source == 'iran':
             print 'Automated downloading of Iran strong motion data is not supported.  Use the -i option instead.'
+            print 'Obtain strong motion records from: http://www.bhrc.ac.ir/portal/Default.aspx?tabid=635'
             sys.exit(1)
         elif args.source == 'iris':
             sys.stderr.write('Fetching strong motion and broadband data from IRIS...\n')
@@ -142,9 +143,15 @@ def main(args,config):
         else:
             print 'Data source %s not supported.' % args.source
             sys.exit(1)
-        datafiles = fetcher.fetch(lat,lon,etime,args.radius,args.timeWindow,rawfolder)
+        try:
+            datafiles = fetcher.fetch(lat,lon,etime,args.radius,args.timeWindow,rawfolder)
+        except Exception,e:
+            print '(Possible) error in trying to download data from %s.  \n"%s"\n' % (args.source,str(e))
         sys.stderr.write('Retrieved %i files.\n' % len(datafiles))
     else: 
+        if not os.path.isdir(args.inputFolder):
+            print 'Could not find folder "%s".  Exiting.' % args.inputFolder
+            sys.exit(1)
         if args.source == 'knet':
             datafiles1 = glob.glob(os.path.join(args.inputFolder,'*.NS'))
             datafiles2 = glob.glob(os.path.join(args.inputFolder,'*.EW'))
@@ -180,6 +187,8 @@ def main(args,config):
     traces = []
     for dfile in datafiles:
         if args.source == 'knet':
+            if dfile.endswith('1'): #these files are KikNet downhole (deep) stations
+                continue
             trace,header = knet.readknet(dfile)
             traces.append(trace)
         elif args.source == 'geonet':
@@ -277,7 +286,8 @@ if __name__ == '__main__':
         getstrong.py iris -e EVENTID
         
         To download data from Iran:
-        download the files from "Digital Records," copy onto your local machine
+        Download the files from "Digital Records," copy onto your local machine
+        (http://www.bhrc.ac.ir/portal/Default.aspx?tabid=635)
         getstrong.py iran -e EVENTID -i PATH WHERE DATA IS LOCATED
         
         To download data from Mexico:
@@ -285,7 +295,7 @@ if __name__ == '__main__':
         getstrong.py unam -e EVENTID -i PATH WHERE DATA IS LOCATED
         
         To download data from Italy:
-        download ASCII corrected files. Copy onto your local machine
+        Download ASCII corrected files. Copy onto your local machine
         getstrong.py italy -e EVENT ID -i PATH WHERE DATA IS LOCATED
         '''
     parser = argparse.ArgumentParser(description=desc,

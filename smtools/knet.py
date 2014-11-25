@@ -8,6 +8,10 @@ import os.path
 import tarfile
 import ftplib
 import urlparse
+import base64
+from collections import OrderedDict
+import urllib2
+import urllib
 
 #local
 from fetcher import StrongMotionFetcher,StrongMotionFetcherException
@@ -22,9 +26,23 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 TIMEFMT = '%Y/%m/%d %H:%M:%S'
+DATEPAT = '[0-9]{4}/[0-9]{2}/[0-9]{2}-[0-9]{2}:[0-9]{2}:[0-9]{2}.[0-9]{2}'
+DATEFMT = '%Y/%m/%d-%H:%M:%S.%f'
 KNET_TRIGGER_DELAY = 15.0 #a delay in the KNet data logger - subtract this from "record time"
 JPTIMEOFF = 9 * 3600 #number of seconds offset from GMT for Japan Standard time
 FTPBASE = 'ftp://www.k-net.bosai.go.jp/knet/alldata/[YEAR]/[MONTH]'
+
+#it is for some reason important that the CGI parameters for the combined knet/kiknet page
+#be in a particular order.
+CGIPARAMS = OrderedDict()
+CGIPARAMS['formattype'] = 'A'
+CGIPARAMS['eqidlist'] = ''
+CGIPARAMS['datanames'] = ''
+CGIPARAMS['alldata'] = None
+CGIPARAMS['datakind'] = 'all'
+
+KIKNETURL = 'http://www.kyoshin.bosai.go.jp/cgi-bin/kyoshin/quick/list_eqid_en.cgi?1+YEAR+QUARTER'
+CGI = 'http://www.kyoshin.bosai.go.jp/cgi-bin/kyoshin/auth/makearc?%s'
 
 class KNETFetcher(StrongMotionFetcher):
     """
@@ -51,11 +69,45 @@ class KNETFetcher(StrongMotionFetcher):
         @return: List of strong motion ASCII data files.
         """
         jptime = etime + timedelta(seconds=JPTIMEOFF)
-        tarfile = self.fetchKNet(self.user,self.password,jptime,timewindow)
+        #tarfile = self.fetchKNet(self.user,self.password,jptime,timewindow)
+        tarfile = self.fetchKNetAndKikNet(self.user,self.password,jptime,timewindow)
         if tarfile is None:
             raise StrongMotionFetcherException('No K-NET data was found within %i seconds of %s (JST).  Returning.' % (timewindow,jptime))
-        datafiles = self.extractDataFiles(tarfile,outfolder)
+        #datafiles = self.extractDataFiles(tarfile,outfolder)
+        datafiles = self.extractAllDataFiles(tarfile,outfolder)
         os.remove(tarfile)
+        return datafiles
+
+    def extractAllDataFiles(self,tarfilename,tarfolder):
+        """
+        Unpack data files from tar file retrieved from K-NET and KikNet.
+        """
+        #tar file should contain three gzipped files:
+        #eventid.knt.tar.gz - KNet data
+        #eventid.kik.tar.gz - KikNet data
+        #eventid.all.img.tar.gz - Plots, we don't care about these
+        knetfolder = os.path.join(tarfolder,'knet')
+        kikfolder = os.path.join(tarfolder,'kiknet')
+        tarball = tarfile.open(name=tarfilename,mode='r')
+        fnames = tarball.getnames()
+        datafiles = []
+        for fname in fnames:
+            if fname.find('knt') > -1:
+                outfolder = knetfolder
+            if fname.find('kik') > -1:
+                outfolder = kikfolder
+            tarball.extract(fname,outfolder)
+            tarfile2 = os.path.join(outfolder,fname)
+            tarball2 = tarfile.open(name=tarfile2,mode='r:gz')
+            tnames = tarball2.getnames()
+            for tname in tnames:
+                if tname.endswith('.gz'):
+                    continue
+                tarball2.extract(tname,path=outfolder)
+                datafiles.append(os.path.abspath(os.path.join(outfolder,tname)))
+            tarball2.close()
+                
+        tarball.close()
         return datafiles
     
     def extractDataFiles(self,tarfilename,tarfolder):
@@ -72,6 +124,56 @@ class KNETFetcher(StrongMotionFetcher):
             datafiles.append(os.path.abspath(os.path.join(tarfolder,fname)))
         tarball.close()
         return datafiles
+
+    def fetchKNetAndKikNet(self,user,password,jptime,timewindow):
+        quarters = {1:1,2:1,3:1,
+                    4:4,5:4,6:4,
+                    7:7,8:7,9:7,
+                    10:10,11:10,12:10}
+        jpyear = str(jptime.year)
+        jpquarter = str(quarters[jptime.month])
+        url = KIKNETURL.replace('YEAR',jpyear)
+        url = url.replace('QUARTER',jpquarter)
+        fh = urllib2.urlopen(url)
+        data = fh.read()
+        fh.close()
+        sidx = data.find('<SELECT NAME="eqidlist"')
+        eidx = data.find('</SELECT>',sidx)+len('</SELECT>')
+        newdata = data[sidx:eidx]
+        lines = newdata.split('\n')
+        localfile = None
+        for line in lines[1:-1]:
+            value = re.search('"(.*?)"',line).group().strip('"')
+            datestr = re.search(DATEPAT,line).group()
+            dtime = datetime.strptime(datestr,DATEFMT)
+            if dtime > jptime:
+                dt = dtime - jptime
+            else:
+                dt = jptime - dtime
+                nsecs = dt.days*86400 + dt.seconds
+                if nsecs > timewindow:
+                    continue
+                cdict = CGIPARAMS.copy()
+                cdict['eqidlist'] = value
+                cdict['datanames'] = value.split(',')[0].strip()
+                cparams = urllib.urlencode(cdict)
+                #something strange and important about the placement and format of the "alldata" parameter
+                cparams = cparams.replace('&alldata=None','%3Balldata')
+                requesturl = CGI % cparams
+                req = urllib2.Request(requesturl)
+                base64string = base64.encodestring('%s:%s' % (user, password))[:-1]
+                req.add_header("Authorization", "Basic %s" % base64string)
+                handle = urllib2.urlopen(req)
+                data = handle.read()
+                handle.close()
+                localfile = os.path.join(os.getcwd(),dtime.strftime('%Y%m%d%H%M%S')+'.tar')
+                f = open(localfile,'wb')
+                f.write(data)
+                f.close()
+                break
+        return localfile
+                
+                                         
     
     def fetchKNet(self,user,password,jptime,timewindow):
         """
@@ -160,6 +262,10 @@ def readheader(hdrlines):
         if line.startswith('Dir.'):
             parts = line.split()
             channel = parts[1].replace('-','')
+            kiknetcomps = {'1':'NS1','2':'EW1','3':'UD1',
+                           '4':'NS2','5':'EW2','6':'UD2'}
+            if channel.strip() in kiknetcomps.keys(): #kiknet directions are 1-6
+                channel = kiknetcomps[channel.strip()]
             hdrdict['channel'] = channel
         if line.startswith('Scale Factor'):
             parts = line.split()
@@ -205,7 +311,7 @@ def readknet(knetfilename):
     hdrdict['npts'] = len(data)
     elapsed = float(hdrdict['npts'])/float(hdrdict['sampling_rate'])
     hdrdict['endtime'] = hdrdict['starttime'] + elapsed
-    hdrdict['network'] = 'JP'
+    hdrdict['network'] = 'NIED'
     hdrdict['location'] = ''
 
     #The Stats constructor appears to modify the fields in the input dictionary - let's save
