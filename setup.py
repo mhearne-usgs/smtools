@@ -7,6 +7,5 @@ setup(name='smtools',
       author_email='mhearne@usgs.gov',
       url='',
       packages=['smtools'],
-      install_requires=['numpy', 'matplotlib', 'scipy'],
       scripts = ['getstrong.py','smcheck.py','getdyfi.py','cloneshake.py'],
 )
