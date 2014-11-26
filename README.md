@@ -62,18 +62,19 @@ Command line usage
 <pre>
 usage: getstrong.py [-h] [-c] [-i INPUTFOLDER] [-d] [-r RADIUS] [-e EVENTID]
                     [-y TIME LAT LON] [-w TIMEWINDOW] [-f FOLDER] [-u USER]
-                    [-p PASSWORD] [-n] [-o]
-                    {knet,geonet,turkey}
+                    [-p PASSWORD] [-n] [-o] [-q] [-v]
+                    {knet,geonet,turkey,iran,iris,italy,unam}
 
         Download and process strong motion data from different sources
         (NZ GeoNet, JP K-NET, Turkey) into peak ground motion values,
         and output in an XML format suitable for inclusion in
-        ShakeMap.
+        ShakeMap.  The output files will be named according to the
+        input data source: knet_dat.xml, geonet_dat.xml, etc.
         
         Generic (non-ShakeMap) Usage:
         To configure the system for further use (you will be prompted for 
         KNET username/password, and ShakeMap home):
-        getstrong.py -c
+        getstrong.py knet -c
         To process data from a local folder (rather than downloading from a remote source):
         getstrong.py -i INPUTFOLDER -f OUTPUTFOLDER
         To process data from a local folder and print peak ground motions to the screen:
@@ -90,17 +91,41 @@ usage: getstrong.py [-h] [-c] [-i INPUTFOLDER] [-d] [-r RADIUS] [-e EVENTID]
 
         ###############################################################
         For Shakemap Users:
-        To download K-NET data for an event into it's input folder, while retaining the raw data:
+        To download K-NET data for an event into the event "input" 
+        folder (the -f option is unnecessary), while retaining the raw data in event "raw" folder:
         
         getstrong.py knet -e EVENTID
         
         To download K-NET data for an event into it's input folder, while deleting the raw data:
         
         getstrong.py knet -e EVENTID -n
+
+        To download data from Turkey:
+        getstrong.py turkey -e EVENTID
+
+        To download data from GeoNet:
+        getstrong.py geonet -e EVENTID
+        
+        To download data from IRIS:
+        getstrong.py iris -e EVENTID
+        
+        To download data from Iran:
+        Download the files from "Digital Records," copy onto your local machine
+        (http://www.bhrc.ac.ir/portal/Default.aspx?tabid=635)
+        getstrong.py iran -e EVENTID -i PATH WHERE DATA IS LOCATED
+        
+        To download data from Mexico:
+        Select all boxes and download. Copy onto the your local machine
+        getstrong.py unam -e EVENTID -i PATH WHERE DATA IS LOCATED
+        
+        To download data from Italy:
+        Download ASCII corrected files. Copy onto your local machine
+        getstrong.py italy -e EVENT ID -i PATH WHERE DATA IS LOCATED
         
 
 positional arguments:
-  {knet,geonet,turkey}  Specify strong motion data source.
+  {knet,geonet,turkey,iran,iris,italy,unam}
+                        Specify strong motion data source.
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -109,7 +134,8 @@ optional arguments:
                         process files from an input folder.
   -d, -debug            print peak ground motions to the screen for debugging.
   -r RADIUS, -radius RADIUS
-                        Specify distance window for search (km).
+                        Specify distance window for search (km) (default: 50
+                        km.)
   -e EVENTID, -event EVENTID
                         Specify event ID (will search ShakeMap data directory.
   -y TIME LAT LON, -hypocenter TIME LAT LON
@@ -126,6 +152,9 @@ optional arguments:
                         Specify K-NET password (defaults to value in config)
   -n, -nuke             Do NOT retain extracted raw data files
   -o, -plot             Make QA plots
+  -q, --noRotation      Do NOT apply rotation to IRAN longitudinal/transverse
+                        channels
+  -v, --verbose         Print out progress/warning messages
 </pre>
 
 <pre>

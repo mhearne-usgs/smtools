@@ -250,7 +250,7 @@ if __name__ == '__main__':
         Generic (non-ShakeMap) Usage:
         To configure the system for further use (you will be prompted for 
         KNET username/password, and ShakeMap home):
-        getstrong.py -c
+        getstrong.py knet -c
         To process data from a local folder (rather than downloading from a remote source):
         getstrong.py -i INPUTFOLDER -f OUTPUTFOLDER
         To process data from a local folder and print peak ground motions to the screen:
