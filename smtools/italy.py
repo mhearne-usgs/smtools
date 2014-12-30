@@ -11,12 +11,12 @@ import os.path
 import urlparse
 import ftplib
 import urllib2
+from xml.dom import minidom
 
 #local
 from fetcher import StrongMotionFetcher,StrongMotionFetcherException
 from trace2xml import trace2xml
 import util
-import datetime
 
 #third party
 from obspy.core.trace import Trace
@@ -25,6 +25,7 @@ from obspy.core.utcdatetime import UTCDateTime
 from obspy.core.util.geodetics import gps2DistAzimuth
 import numpy as np
 import matplotlib.pyplot as plt
+from bs4 import BeautifulSoup
 
 HEADERS = {'STATION_CODE':'station',
            'STREAM':'channel',
@@ -39,6 +40,27 @@ HEADERS = {'STATION_CODE':'station',
            'NETWORK':'network'}
 
 TIMEFMT = '%Y%m%d_%H%M%S.%f'
+
+URL = 'http://itaca.mi.ingv.it/ItacaNet/CadmoDriver?_action_prepare_find_div=1&_page=ACC_Events_Stations_Waveform_progressive&_rock=INVALID&_state=find_progressive_div&_tabber=1&_token=NULLNULLNULLNULL&_startvalue_event_time=STARTTIME&_stopvalue_event_time=STOPTIME'
+
+def fetchItaly(starttime,endtime):
+    url = URL.replace('STARTTIME',starttime.strftime('%Y-%m-%d'))
+    url = url.replace('STOPTIME',endtime.strftime('%Y-%m-%d'))
+    fh = urllib2.urlopen(url)
+    data = fh.read()
+    fh.close()
+    startidx = data.find('<table class="CADMOMAINTABLE">')
+    endidx = data.find('<!-- end of CADMOMAINTABLE -->')
+    newdata = data[startidx:endidx]
+    soup = BeautifulSoup(newdata)
+    rows = soup.findAll('tr')
+    for row in rows[1:]:
+        cell = row.findAll('td')[0]
+        anchor = cell.findAll('a')[0]
+        eventid = anchor['id']
+        #2009-04-05 20:20:53
+        etime = datetime.strptime(anchor.string,'%Y-%m-%d %H:%M:%S')
+        print eventid,str(etime)
 
 def readitaly(datafile):
     f = open(datafile,'rt')
@@ -78,8 +100,11 @@ def readitaly(datafile):
     return trace
 
 if __name__ == '__main__':
-    filename = sys.argv[1]
-    trace = readitaly(filename)
-    trace.plot()
-    plt.savefig('tmpitaly.png')
+    # filename = sys.argv[1]
+    # trace = readitaly(filename)
+    # trace.plot()
+    # plt.savefig('tmpitaly.png')
+    starttime = datetime(2009,4,5)
+    stoptime = datetime(2009,4,6)
+    fetchItaly(starttime,stoptime)
     

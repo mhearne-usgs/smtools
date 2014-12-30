@@ -57,6 +57,61 @@ def smPSA(data, samp_rate):
 
     return out
 
+def amps2xml(stationlist,outfolder,netsource):
+    '''
+    stationlist - list of station dictionaries.  Each station has fields:
+     - lat
+     - lon
+     - code
+     - name
+     - channels - dictionary of dictionaries, where keys are channel names, and values are:
+       - pga
+       - pgv
+       - psa03
+       - psa10
+       - psa30
+    '''
+    stationlist_tag = Tag('stationlist',attributes={'created':datetime.utcnow().strftime('%s')})
+    for station in stationlist:
+        name = station['name']
+        code = station['code']
+        net,sta = code.split('.')
+        lat = station['lat']
+        lon = station['lon']
+        instrument = ''
+        source = netsource
+        channels = station['channels']
+        stationtag = Tag('station',attributes={'code':code,'name':sta,
+                                               'insttype':instrument,'source':netsource,
+                                               'netid':net,'commtype':'DIG',
+                                               'lat':lat,'lon':lon,
+                                               'loc':name})
+        for channelkey,channeldict in channels.iteritems():
+            comptag = Tag('comp',attributes={'name':channelkey})
+            pga = channeldict['pga']
+            pgv = channeldict['pgv']
+            psa03 = channeldict['psa03']
+            psa10 = channeldict['psa10']
+            psa30 = channeldict['psa30']
+            psa03tag = Tag('psa03',attributes={'value':psa03})
+            psa10tag = Tag('psa10',attributes={'value':psa10})
+            psa30tag = Tag('psa30',attributes={'value':psa30})
+            acctag = Tag('acc',attributes={'value':pga})
+            veltag = Tag('vel',attributes={'value':pgv})
+            comptag.addChild(acctag)
+            comptag.addChild(veltag)
+            comptag.addChild(psa03tag)
+            comptag.addChild(psa10tag)
+            comptag.addChild(psa30tag)
+            stationtag.addChild(comptag)
+        stationlist_tag.addChild(stationtag)
+
+    outfile = os.path.join(outfolder,'%s_dat.xml' % netsource)
+    print 'Saving to %s' % outfile
+    stationlist_tag.renderToXML(filename=outfile,ntabs=1)
+    return (outfile,stationlist_tag)
+            
+
 def trace2xml(traces,parser,outfolder,netsource,doPlot=False):
     """
     Calibrate accelerometer data, derive peak ground motion values, and write a ShakeMap-compatible data file.
@@ -233,11 +288,26 @@ def trace2xml(traces,parser,outfolder,netsource,doPlot=False):
     return (outfile,plotfiles,stationlist_tag)
 
 if __name__ == '__main__':
-    seedfile = sys.argv[1]
-    sacfiles = sys.argv[2:]
-    parser = Parser(seedfile)
-    traces = []
-    for sacfile in sacfiles:
-        stream = read(sacfile)
-        traces.append(stream[0])
-    outfile,pltofiles,tag = trace2xml(traces,parser,os.getcwd(),doPlot=True)
+    # seedfile = sys.argv[1]
+    # sacfiles = sys.argv[2:]
+    # parser = Parser(seedfile)
+    # traces = []
+    # for sacfile in sacfiles:
+    #     stream = read(sacfile)
+    #     traces.append(stream[0])
+    # outfile,pltofiles,tag = trace2xml(traces,parser,os.getcwd(),doPlot=True)
+    station1 = {'lat':43.25,'lon':23.76,'code':'US.HVS','name':'Freds Garage',
+                'channels':{
+                    'HHN':{'pga':23.1,'pgv':10.2,
+                           'psa03':11.8,'psa10':12.9,'psa30':13.1},
+                    'HHE':{'pga':23.1,'pgv':10.2,
+                           'psa03':11.8,'psa10':12.9,'psa30':13.1},
+                    'HHZ':{'pga':23.1,'pgv':10.2,
+                           'psa03':11.8,'psa10':12.9,'psa30':13.1}}}
+    stationlist = [station1]
+    outfile,stag = amps2xml(stationlist,os.getcwd(),'us')
+                           
+                           
+                                   
+                                   
+    

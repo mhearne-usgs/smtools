@@ -16,8 +16,8 @@ import re
 import collections
 
 #import local
-from smtools import knet,geonet,turkey,iran,iris,italy,unam,util
-from smtools.trace2xml import trace2xml
+from smtools import knet,geonet,turkey,iran,iris,italy,unam,util,orfeus
+from smtools import trace2xml
 
 #constants
 TIMEWINDOW = 60 #number of seconds within which to search for matching event on knet/geonet site
@@ -112,6 +112,11 @@ def main(args,config):
         
     datafiles = []
     if not args.inputFolder:
+        if args.source == 'orfeus':
+            stationlist = orfeus.getAmps(lat,lon,etime,args.timeWindow,args.radius)
+            outfile,stationlist_tag = trace2xml.amps2xml(stationlist,outfolder,'orfeus')
+            print 'Retrieved peak ground motions from %i European stations' % len(stationlist)
+            sys.exit(0)
         if args.source == 'knet':
             if not args.user:
                 user = config.get('KNET','user')
@@ -151,6 +156,9 @@ def main(args,config):
     else: 
         if not os.path.isdir(args.inputFolder):
             print 'Could not find folder "%s".  Exiting.' % args.inputFolder
+            sys.exit(1)
+        if args.source == 'orfeus':
+            print 'Offline data processing not supported for Orfeus.'
             sys.exit(1)
         if args.source == 'knet':
             datafiles1 = glob.glob(os.path.join(args.inputFolder,'*.NS'))
@@ -217,7 +225,7 @@ def main(args,config):
             sys.exit(1)
     if len(datafiles):
         sys.stderr.write('Converting %i files to peak ground motion...\n' % len(datafiles))
-        stationfile,plotfiles,tag = trace2xml(traces,None,outfolder,args.source,doPlot=args.doPlot)
+        stationfile,plotfiles,tag = trace2xml.trace2xml(traces,None,outfolder,args.source,doPlot=args.doPlot)
         if args.debug:
             os.remove(stationfile)
             for pfile in plotfiles:
@@ -300,7 +308,7 @@ if __name__ == '__main__':
         '''
     parser = argparse.ArgumentParser(description=desc,
                                      formatter_class=argparse.RawDescriptionHelpFormatter,)
-    parser.add_argument('source',help='Specify strong motion data source.',choices=['knet','geonet','turkey','iran','iris','italy','unam'])
+    parser.add_argument('source',help='Specify strong motion data source.',choices=['knet','geonet','turkey','iran','iris','italy','unam','orfeus'])
     parser.add_argument('-c','-config',dest='doConfig',action='store_true',default=False,
                         help='Create config file for future use')
     parser.add_argument('-i','-inputfolder',dest='inputFolder',
