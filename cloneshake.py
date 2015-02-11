@@ -191,7 +191,10 @@ def writeEvent(gmpe,ipe,gmice,vs30,faulturl,stationurl,eventdict,shakehome):
     print 'Writing grind config to %s' % grindfile
 
 def getShakeURLs(shakeurl):
-    fh = urllib2.urlopen(shakeurl[0:-1]+'.geojson')
+    urlt = 'http://earthquake.usgs.gov/earthquakes/feed/v1.0/detail/[EVENTID].geojson'
+    eventid = urlparse.urlparse(shakeurl).path.strip('/').split('/')[-1]
+    url = urlt.replace('[EVENTID]',eventid)
+    fh = urllib2.urlopen(url)
     data = fh.read()
     jdict = json.loads(data)
     fh.close()
