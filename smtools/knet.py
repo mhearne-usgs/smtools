@@ -69,8 +69,8 @@ class KNETFetcher(StrongMotionFetcher):
         @return: List of strong motion ASCII data files.
         """
         jptime = etime + timedelta(seconds=JPTIMEOFF)
-        #tarfile = self.fetchKNet(self.user,self.password,jptime,timewindow)
-        tarfile = self.fetchKNetAndKikNet(self.user,self.password,jptime,timewindow)
+        tarfile = self.fetchKNet(self.user,self.password,jptime,timewindow)
+        #tarfile = self.fetchKNetAndKikNet(self.user,self.password,jptime,timewindow)
         if tarfile is None:
             raise StrongMotionFetcherException('No K-NET data was found within %i seconds of %s (JST).  Returning.' % (timewindow,jptime))
         #datafiles = self.extractDataFiles(tarfile,outfolder)
@@ -150,27 +150,27 @@ class KNETFetcher(StrongMotionFetcher):
                 dt = dtime - jptime
             else:
                 dt = jptime - dtime
-                nsecs = dt.days*86400 + dt.seconds
-                if nsecs > timewindow:
-                    continue
-                cdict = CGIPARAMS.copy()
-                cdict['eqidlist'] = value
-                cdict['datanames'] = value.split(',')[0].strip()
-                cparams = urllib.urlencode(cdict)
-                #something strange and important about the placement and format of the "alldata" parameter
-                cparams = cparams.replace('&alldata=None','%3Balldata')
-                requesturl = CGI % cparams
-                req = urllib2.Request(requesturl)
-                base64string = base64.encodestring('%s:%s' % (user, password))[:-1]
-                req.add_header("Authorization", "Basic %s" % base64string)
-                handle = urllib2.urlopen(req)
-                data = handle.read()
-                handle.close()
-                localfile = os.path.join(os.getcwd(),dtime.strftime('%Y%m%d%H%M%S')+'.tar')
-                f = open(localfile,'wb')
-                f.write(data)
-                f.close()
-                break
+            nsecs = dt.days*86400 + dt.seconds
+            if nsecs > timewindow:
+                continue
+            cdict = CGIPARAMS.copy()
+            cdict['eqidlist'] = value
+            cdict['datanames'] = value.split(',')[0].strip()
+            cparams = urllib.urlencode(cdict)
+            #something strange and important about the placement and format of the "alldata" parameter
+            cparams = cparams.replace('&alldata=None','%3Balldata')
+            requesturl = CGI % cparams
+            req = urllib2.Request(requesturl)
+            base64string = base64.encodestring('%s:%s' % (user, password))[:-1]
+            req.add_header("Authorization", "Basic %s" % base64string)
+            handle = urllib2.urlopen(req)
+            data = handle.read()
+            handle.close()
+            localfile = os.path.join(os.getcwd(),dtime.strftime('%Y%m%d%H%M%S')+'.tar')
+            f = open(localfile,'wb')
+            f.write(data)
+            f.close()
+            break
         return localfile
                 
                                          
