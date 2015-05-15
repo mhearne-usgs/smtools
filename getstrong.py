@@ -23,6 +23,15 @@ from smtools import trace2xml
 TIMEWINDOW = 60 #number of seconds within which to search for matching event on knet/geonet site
 DISTWINDOW = 50 #number of seconds within which to search for matching event on knet/geonet site
 
+SUPPORTED_NETWORKS = {'knet':'Japanese Strong Motion (NIED)',
+                      'geonet':'New Zealand (GNS)',
+                      'turkey':'Turkish strong motion repository',
+                      'iran':'Iranian strong motion repository',
+                      'iris':'Incorporated Research Institutions for Seismology',
+                      'italy':'Italian strong motion (INGV)',
+                      'unam':'Mexican strong motion data (UNAM)',
+                      'orfeus':'Integrated European strong motion data repository'}
+
 def doConfig():
     shakehome = raw_input('Please specify the root folder where ShakeMap is installed: ')
     if not os.path.isdir(shakehome):
@@ -80,6 +89,13 @@ def printTag(tag):
         print
         
 def main(args,config):
+    if args.listSources:
+        print '%-15s\t%-40s' % ('Network','Description')
+        print '------------------------------------------'
+        for key,value in SUPPORTED_NETWORKS.iteritems():
+            print '%-15s\t%-40s' % (key,value)
+        sys.exit(0)
+        
     if args.doConfig:
         doConfig()
         sys.exit(0)
@@ -259,6 +275,20 @@ if __name__ == '__main__':
         To configure the system for further use (you will be prompted for 
         KNET username/password, and ShakeMap home):
         getstrong.py knet -c
+
+        To list all of the networks and their descriptions:
+        getstrong.py knet -s (still necessary to supply a data source, which is arguably kind of stupid)
+        Network        	Description                             
+        ------------------------------------------
+        turkey         	Turkish strong motion repository        
+        iris           	Incorporated Research Institutions for Seismology
+        iran           	Iranian strong motion repository        
+        geonet         	New Zealand (GNS)                       
+        knet           	Japanese Strong Motion (NIED)           
+        italy          	Italian strong motion (INGV)            
+        orfeus         	Integrated European strong motion data repository
+        unam           	Mexican strong motion data (UNAM) 
+        
         To process data from a local folder (rather than downloading from a remote source):
         getstrong.py -i INPUTFOLDER -f OUTPUTFOLDER
         To process data from a local folder and print peak ground motions to the screen:
@@ -309,6 +339,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=desc,
                                      formatter_class=argparse.RawDescriptionHelpFormatter,)
     parser.add_argument('source',help='Specify strong motion data source.',choices=['knet','geonet','turkey','iran','iris','italy','unam','orfeus'])
+    parser.add_argument('-s','-sources',dest='listSources',action='store_true',default=False,
+                        help='Describe various sources for strong motion data')
     parser.add_argument('-c','-config',dest='doConfig',action='store_true',default=False,
                         help='Create config file for future use')
     parser.add_argument('-i','-inputfolder',dest='inputFolder',

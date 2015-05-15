@@ -60,10 +60,10 @@ Command line usage
 ------------------
 
 <pre>
-usage: getstrong.py [-h] [-c] [-i INPUTFOLDER] [-d] [-r RADIUS] [-e EVENTID]
-                    [-y TIME LAT LON] [-w TIMEWINDOW] [-f FOLDER] [-u USER]
-                    [-p PASSWORD] [-n] [-o] [-q] [-v]
-                    {knet,geonet,turkey,iran,iris,italy,unam}
+usage: getstrong.py [-h] [-s] [-c] [-i INPUTFOLDER] [-d] [-r RADIUS]
+                    [-e EVENTID] [-y TIME LAT LON] [-w TIMEWINDOW] [-f FOLDER]
+                    [-u USER] [-p PASSWORD] [-n] [-o] [-q] [-v]
+                    {knet,geonet,turkey,iran,iris,italy,unam,orfeus}
 
         Download and process strong motion data from different sources
         (NZ GeoNet, JP K-NET, Turkey) into peak ground motion values,
@@ -75,6 +75,20 @@ usage: getstrong.py [-h] [-c] [-i INPUTFOLDER] [-d] [-r RADIUS] [-e EVENTID]
         To configure the system for further use (you will be prompted for 
         KNET username/password, and ShakeMap home):
         getstrong.py knet -c
+
+        To list all of the networks and their descriptions:
+        getstrong.py knet -s (still necessary to supply a data source, which is arguably kind of stupid)
+        Network        	Description                             
+        ------------------------------------------
+        turkey         	Turkish strong motion repository        
+        iris           	Incorporated Research Institutions for Seismology
+        iran           	Iranian strong motion repository        
+        geonet         	New Zealand (GNS)                       
+        knet           	Japanese Strong Motion (NIED)           
+        italy          	Italian strong motion (INGV)            
+        orfeus         	Integrated European strong motion data repository
+        unam           	Mexican strong motion data (UNAM) 
+        
         To process data from a local folder (rather than downloading from a remote source):
         getstrong.py -i INPUTFOLDER -f OUTPUTFOLDER
         To process data from a local folder and print peak ground motions to the screen:
@@ -124,11 +138,12 @@ usage: getstrong.py [-h] [-c] [-i INPUTFOLDER] [-d] [-r RADIUS] [-e EVENTID]
         
 
 positional arguments:
-  {knet,geonet,turkey,iran,iris,italy,unam}
+  {knet,geonet,turkey,iran,iris,italy,unam,orfeus}
                         Specify strong motion data source.
 
 optional arguments:
   -h, --help            show this help message and exit
+  -s, -sources          Describe various sources for strong motion data
   -c, -config           Create config file for future use
   -i INPUTFOLDER, -inputfolder INPUTFOLDER
                         process files from an input folder.
