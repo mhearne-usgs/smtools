@@ -63,7 +63,9 @@ bias_log_amp      : true
 direct_patch_size : 1000
 topobin : <HOME>/bin/topo2grd <EVID> <BOUND> regime=active
 mi2pgm : GMICE
-pgm2mi : GMICE'''
+pgm2mi : GMICE
+
+source_network : us'''
 
 def readInfo(infourl):
     try:
@@ -156,7 +158,7 @@ def writeEvent(gmpe,ipe,gmice,vs30,faulturl,stationurl,eventdict,shakehome):
         fh = urllib2.urlopen(stationurl)
         data = fh.read()
         fh.close()
-        datafile = os.path.join(datadir,'stationlist.dat')
+        datafile = os.path.join(inputdir,'stationlist.xml')
         f = open(datafile,'wt')
         f.write(data)
         f.close()
