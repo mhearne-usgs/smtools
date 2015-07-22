@@ -153,6 +153,11 @@ def trace2xml(traces,parser,outfolder,netsource,doPlot=False):
                 sys.stderr.write('Could not get station coordinates from trace object of station %s\n' % station)
                 continue
 
+        #If we have separate calibration data, apply it here
+        if parser is not None:
+            trace.simulate(paz_remove=paz,remove_sensitivity=True,simulate_sensitivity=False)
+            trace.stats['units'] = 'acc' #ASSUMING THAT ANY SAC DATA IS ACCELERATION!
+            
         #make the component tag to hold the measurements
         comptag = Tag('comp',attributes={'name':channel})
         if trace.stats['units'] == 'acc':
@@ -160,8 +165,7 @@ def trace2xml(traces,parser,outfolder,netsource,doPlot=False):
             trace.detrend('linear')
             trace.detrend('demean')
             trace.taper(max_percentage=0.05, type='cosine')
-            if parser is not None:
-                trace.simulate(paz_remove=paz,remove_sensitivity=True,simulate_sensitivity=False)
+            
             
             trace.filter('highpass',freq=FILTER_FREQ,zerophase=True,corners=CORNERS)
             

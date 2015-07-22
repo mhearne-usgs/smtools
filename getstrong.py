@@ -19,6 +19,10 @@ import collections
 from smtools import knet,geonet,turkey,iran,iris,italy,unam,util,orfeus
 from smtools import trace2xml
 
+#third party
+from obspy.xseed import Parser
+import obspy
+
 #constants
 TIMEWINDOW = 60 #number of seconds within which to search for matching event on knet/geonet site
 DISTWINDOW = 50 #number of seconds within which to search for matching event on knet/geonet site
@@ -30,7 +34,8 @@ SUPPORTED_NETWORKS = {'knet':'Japanese Strong Motion (NIED)',
                       'iris':'Incorporated Research Institutions for Seismology',
                       'italy':'Italian strong motion (INGV)',
                       'unam':'Mexican strong motion data (UNAM)',
-                      'orfeus':'Integrated European strong motion data repository'}
+                      'orfeus':'Integrated European strong motion data repository',
+                      'SAC':'Any data in SAC format (must also provide dataless seed in input directory'}
 
 def doConfig():
     shakehome = raw_input('Please specify the root folder where ShakeMap is installed: ')
@@ -125,7 +130,11 @@ def main(args,config):
         etime = args.Params.time
         lat = args.Params.lat
         lon = args.Params.lon
-        
+
+    #Most formats are pre-calibrated, so we'll set parse to None for those.
+    #Those formats that need a parser object (like SAC data files need a dataless SEED file)
+    #will fill in the parser object below.
+    parser = None
     datafiles = []
     if not args.inputFolder:
         if args.source == 'orfeus':
@@ -152,6 +161,10 @@ def main(args,config):
             print 'Automated downloading of Iran strong motion data is not supported.  Use the -i option instead.'
             print 'Obtain strong motion records from: http://www.bhrc.ac.ir/portal/Default.aspx?tabid=635'
             sys.exit(1)
+        elif args.source == 'sac':
+            print 'Automated downloading of SAC strong motion data is not supported.  Use the -i option instead.'
+            print 'SAC is a data standard, not a source.  You will need to have obtained SAC data from your own source.'
+            sys.exit(1)
         elif args.source == 'iris':
             sys.stderr.write('Fetching strong motion and broadband data from IRIS...\n')
             fetcher = iris.IrisFetcher(verbose=args.verbose) #will get strong motion AND broadband
@@ -170,6 +183,7 @@ def main(args,config):
             print '(Possible) error in trying to download data from %s.  \n"%s"\n' % (args.source,str(e))
         sys.stderr.write('Retrieved %i files.\n' % len(datafiles))
     else: 
+        
         if not os.path.isdir(args.inputFolder):
             print 'Could not find folder "%s".  Exiting.' % args.inputFolder
             sys.exit(1)
@@ -196,6 +210,13 @@ def main(args,config):
             datafiles = glob.glob(os.path.join(args.inputFolder,'*.pickle'))
         elif args.source == 'italy':
             datafiles = glob.glob(os.path.join(args.inputFolder,'*DAT'))
+        elif args.source == 'sac':
+            datafiles = glob.glob(os.path.join(args.inputFolder,'*.sac'))
+            seedfiles = glob.glob(os.path.join(args.inputFolder,'*.seed'))
+            if not len(seedfiles):
+                print 'A dataless SEED file (ending in .seed) must be supplied with input SAC files. Exiting.'
+                sys.exit(1)
+            parser = Parser(seedfiles[0])
         elif args.source == 'unam':
             tdatafiles = glob.glob(os.path.join(args.inputFolder,'*')) #grab everything
             datafiles = []
@@ -236,12 +257,16 @@ def main(args,config):
         elif args.source == 'unam':
             tracelist,headers = unam.readunam(dfile)
             traces = traces + tracelist
+        elif args.source == 'sac':
+            stream = obspy.read(dfile)
+            for trace in stream:
+                traces.append(trace)
         else:
             print 'Source %s is not supported' % (args.source)
             sys.exit(1)
     if len(datafiles):
         sys.stderr.write('Converting %i files to peak ground motion...\n' % len(datafiles))
-        stationfile,plotfiles,tag = trace2xml.trace2xml(traces,None,outfolder,args.source,doPlot=args.doPlot)
+        stationfile,plotfiles,tag = trace2xml.trace2xml(traces,parser,outfolder,args.source,doPlot=args.doPlot)
         if args.debug:
             os.remove(stationfile)
             for pfile in plotfiles:
@@ -288,6 +313,7 @@ if __name__ == '__main__':
         italy          	Italian strong motion (INGV)            
         orfeus         	Integrated European strong motion data repository
         unam           	Mexican strong motion data (UNAM) 
+        sac             (Not a network) Data files in SAC format.
         
         To process data from a local folder (rather than downloading from a remote source):
         getstrong.py -i INPUTFOLDER -f OUTPUTFOLDER
@@ -302,6 +328,10 @@ if __name__ == '__main__':
 
         To retrieve data from Turkey:
         getstrong.py turkey -f ~/tmp/knet -y 2003-05-01T00:27:06 38.970 40.450
+
+        To process local SAC data (input directory must contain one or more SAC files with 
+        file extension .sac, and one dataless SEED file with extension .seed:
+        getstrong.py sac -i /mydata/sacfiles -f /home/shake/ShakeMap/data/EVENT/input
 
         ###############################################################
         For Shakemap Users:
@@ -338,7 +368,9 @@ if __name__ == '__main__':
         '''
     parser = argparse.ArgumentParser(description=desc,
                                      formatter_class=argparse.RawDescriptionHelpFormatter,)
-    parser.add_argument('source',help='Specify strong motion data source.',choices=['knet','geonet','turkey','iran','iris','italy','unam','orfeus'])
+    parser.add_argument('source',help='Specify strong motion data source.',choices=['knet','geonet','turkey','iran',
+                                                                                    'iris','italy','unam','orfeus',
+                                                                                    'sac'])
     parser.add_argument('-s','-sources',dest='listSources',action='store_true',default=False,
                         help='Describe various sources for strong motion data')
     parser.add_argument('-c','-config',dest='doConfig',action='store_true',default=False,

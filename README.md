@@ -63,7 +63,7 @@ Command line usage
 usage: getstrong.py [-h] [-s] [-c] [-i INPUTFOLDER] [-d] [-r RADIUS]
                     [-e EVENTID] [-y TIME LAT LON] [-w TIMEWINDOW] [-f FOLDER]
                     [-u USER] [-p PASSWORD] [-n] [-o] [-q] [-v]
-                    {knet,geonet,turkey,iran,iris,italy,unam,orfeus}
+                    {knet,geonet,turkey,iran,iris,italy,unam,orfeus,sac}
 
         Download and process strong motion data from different sources
         (NZ GeoNet, JP K-NET, Turkey) into peak ground motion values,
@@ -88,6 +88,7 @@ usage: getstrong.py [-h] [-s] [-c] [-i INPUTFOLDER] [-d] [-r RADIUS]
         italy          	Italian strong motion (INGV)            
         orfeus         	Integrated European strong motion data repository
         unam           	Mexican strong motion data (UNAM) 
+        sac             (Not a network) Data files in SAC format.
         
         To process data from a local folder (rather than downloading from a remote source):
         getstrong.py -i INPUTFOLDER -f OUTPUTFOLDER
@@ -102,6 +103,10 @@ usage: getstrong.py [-h] [-s] [-c] [-i INPUTFOLDER] [-d] [-r RADIUS]
 
         To retrieve data from Turkey:
         getstrong.py turkey -f ~/tmp/knet -y 2003-05-01T00:27:06 38.970 40.450
+
+        To process local SAC data (input directory must contain one or more SAC files with 
+        file extension .sac, and one dataless SEED file with extension .seed:
+        getstrong.py sac -i /mydata/sacfiles -f /home/shake/ShakeMap/data/EVENT/input
 
         ###############################################################
         For Shakemap Users:
@@ -138,7 +143,7 @@ usage: getstrong.py [-h] [-s] [-c] [-i INPUTFOLDER] [-d] [-r RADIUS]
         
 
 positional arguments:
-  {knet,geonet,turkey,iran,iris,italy,unam,orfeus}
+  {knet,geonet,turkey,iran,iris,italy,unam,orfeus,sac}
                         Specify strong motion data source.
 
 optional arguments:
