@@ -218,7 +218,11 @@ def getShakeURLs(shakeurl):
     
 def main(shakeurl):
     #remove any stuff after a # sign in the url
-    shakeurl = shakeurl[0:shakeurl.find('#')]
+    if shakeurl.find('#') == -1:
+        endidx = len(shakeurl)
+    else:
+        endidx = shakeurl.find('#')
+    shakeurl = shakeurl[0:endidx]
     if not shakeurl.endswith('/'):
         shakeurl += '/'
     #shakeurl: http://earthquake.usgs.gov/earthquakes/shakemap/ut/shake/shakeoutff_se/
