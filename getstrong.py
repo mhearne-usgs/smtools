@@ -16,7 +16,7 @@ import re
 import collections
 
 #import local
-from smtools import knet,geonet,turkey,iran,iris,italy,unam,util,orfeus
+from smtools import knet,geonet,turkey,iran,iris,italy,unam,util,orfeus,chile
 from smtools import trace2xml
 
 #third party
@@ -35,7 +35,8 @@ SUPPORTED_NETWORKS = {'knet':'Japanese Strong Motion (NIED)',
                       'italy':'Italian strong motion (INGV)',
                       'unam':'Mexican strong motion data (UNAM)',
                       'orfeus':'Integrated European strong motion data repository',
-                      'SAC':'Any data in SAC format (must also provide dataless seed in input directory'}
+                      'SAC':'Any data in SAC format (must also provide dataless seed in input directory',
+                      'chile':'Calibrated ASCII data from Chilean seismic network'}
 
 def doConfig():
     shakehome = raw_input('Please specify the root folder where ShakeMap is installed: ')
@@ -165,6 +166,9 @@ def main(args,config):
             print 'Automated downloading of SAC strong motion data is not supported.  Use the -i option instead.'
             print 'SAC is a data standard, not a source.  You will need to have obtained SAC data from your own source.'
             sys.exit(1)
+        elif args.source == 'chile':
+            print 'Automated downloading of Chilean calibrated ASCII strong motion data is not supported.  Use the -i option instead.'
+            sys.exit(1)
         elif args.source == 'iris':
             sys.stderr.write('Fetching strong motion and broadband data from IRIS...\n')
             fetcher = iris.IrisFetcher(verbose=args.verbose) #will get strong motion AND broadband
@@ -206,6 +210,8 @@ def main(args,config):
                     datafiles.append(d)
         elif args.source == 'iran':
             datafiles = glob.glob(os.path.join(args.inputFolder,'*.V1'))
+        elif args.source == 'chile':
+            datafiles = glob.glob(os.path.join(args.inputFolder,'*.asc'))
         elif args.source == 'iris':
             datafiles = glob.glob(os.path.join(args.inputFolder,'*.pickle'))
         elif args.source == 'italy':
@@ -253,6 +259,9 @@ def main(args,config):
             traces.append(trace)
         elif args.source == 'italy':
             trace = italy.readitaly(dfile)
+            traces.append(trace)
+        elif args.source == 'chile':
+            trace = chile.readchile(dfile)
             traces.append(trace)
         elif args.source == 'unam':
             tracelist,headers = unam.readunam(dfile)
@@ -370,7 +379,7 @@ if __name__ == '__main__':
                                      formatter_class=argparse.RawDescriptionHelpFormatter,)
     parser.add_argument('source',help='Specify strong motion data source.',choices=['knet','geonet','turkey','iran',
                                                                                     'iris','italy','unam','orfeus',
-                                                                                    'sac'])
+                                                                                    'sac','chile'])
     parser.add_argument('-s','-sources',dest='listSources',action='store_true',default=False,
                         help='Describe various sources for strong motion data')
     parser.add_argument('-c','-config',dest='doConfig',action='store_true',default=False,
