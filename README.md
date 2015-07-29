@@ -212,3 +212,29 @@ positional arguments:
 optional arguments:
   -h, --help  show this help message and exit
 </pre>
+
+<pre>
+usage: filtertrace.py [-h] [-t]
+                      {knet,geonet,turkey,iran,iris,italy,unam,orfeus,sac,chile}
+                      files [files ...]
+
+Pre-process data in any of the formats supported by getstrong.py. Currently supported: trimming.
+    Example: 
+    Trim Chile ASCII files:
+
+    filtertrace.py -t chile ~/data/chile2/GO01_HN*.asc
+
+    For each channel in each sensor, an interactive plot will appear.  To select the new ending time for the
+    trace, left click on the plot.  A vertical red line will be drawn at that location.  Right click to accept
+    that time, and close the window to proceed to the next trace.
+    
+
+positional arguments:
+  {knet,geonet,turkey,iran,iris,italy,unam,orfeus,sac,chile}
+                        Specify strong motion data source.
+  files                 Filenames to process.
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -t, --trim            Interactively trim the latter part of a trace.
+</pre>
