@@ -36,7 +36,8 @@ SUPPORTED_NETWORKS = {'knet':'Japanese Strong Motion (NIED)',
                       'unam':'Mexican strong motion data (UNAM)',
                       'orfeus':'Integrated European strong motion data repository',
                       'SAC':'Any data in SAC format (must also provide dataless seed in input directory',
-                      'chile':'Calibrated ASCII data from Chilean seismic network'}
+                      'chile':'Calibrated ASCII data from Chilean seismic network',
+                      'pickle':'Calibrated strong motion data from any source',}
 
 def doConfig():
     shakehome = raw_input('Please specify the root folder where ShakeMap is installed: ')
@@ -169,6 +170,9 @@ def main(args,config):
         elif args.source == 'chile':
             print 'Automated downloading of Chilean calibrated ASCII strong motion data is not supported.  Use the -i option instead.'
             sys.exit(1)
+        elif args.source == 'pickle':
+            print 'Automated downloading of Chilean calibrated ASCII strong motion data is not supported.  Use the -i option instead.'
+            sys.exit(1)
         elif args.source == 'iris':
             sys.stderr.write('Fetching strong motion and broadband data from IRIS...\n')
             fetcher = iris.IrisFetcher(verbose=args.verbose) #will get strong motion AND broadband
@@ -212,6 +216,8 @@ def main(args,config):
             datafiles = glob.glob(os.path.join(args.inputFolder,'*.V1'))
         elif args.source == 'chile':
             datafiles = glob.glob(os.path.join(args.inputFolder,'*.asc'))
+        elif args.source == 'pickle':
+            datafiles = glob.glob(os.path.join(args.inputFolder,'*.pickle'))
         elif args.source == 'iris':
             datafiles = glob.glob(os.path.join(args.inputFolder,'*.pickle'))
         elif args.source == 'italy':
@@ -263,6 +269,10 @@ def main(args,config):
         elif args.source == 'chile':
             trace = chile.readchile(dfile)
             traces.append(trace)
+        elif args.source == 'pickle':
+            stream = obspy.core.read(dfile)
+            for trace in stream:
+                traces.append(trace)
         elif args.source == 'unam':
             tracelist,headers = unam.readunam(dfile)
             traces = traces + tracelist
@@ -379,7 +389,7 @@ if __name__ == '__main__':
                                      formatter_class=argparse.RawDescriptionHelpFormatter,)
     parser.add_argument('source',help='Specify strong motion data source.',choices=['knet','geonet','turkey','iran',
                                                                                     'iris','italy','unam','orfeus',
-                                                                                    'sac','chile'])
+                                                                                    'sac','chile','pickle'])
     parser.add_argument('-s','-sources',dest='listSources',action='store_true',default=False,
                         help='Describe various sources for strong motion data')
     parser.add_argument('-c','-config',dest='doConfig',action='store_true',default=False,

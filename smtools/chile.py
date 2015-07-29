@@ -51,7 +51,7 @@ def readchile(ascfile):
                 continue
             elif line.startswith('# Estacion'):
                 parts = line.split(':')
-                hdrdict['location'] = parts[1].strip()
+                hdrdict['station'] = parts[1].strip()
                 continue
             elif line.startswith('# Componente'):
                 parts = line.split(':')
@@ -62,11 +62,21 @@ def readchile(ascfile):
                 hdrdict['lat'] = float(parts[2])
                 hdrdict['lon'] = float(parts[4])
                 continue
+            elif line.startswith('# Unidades'):
+                parts = line.split(':')
+                units = parts[1].strip()
+                if units == 'm/seg/seg':
+                    calib = 1.0
+                elif units == 'g':
+                    calib = 9.8
+                else:
+                    raise ValueError('Unsupported units of "%s".' % units)
+                continue
         else:
             data.append(float(line.strip()))
     data = np.array(data)
-    
-    hdrdict['calib'] = 1.0
+    data *= calib
+    hdrdict['calib'] = calib
     hdrdict['delta'] = 1.0/hdrdict['sampling_rate']
     hdrdict['duration'] = hdrdict['starttime'] + hdrdict['delta']*hdrdict['npts']
     hdrdict['network'] = 'CL'

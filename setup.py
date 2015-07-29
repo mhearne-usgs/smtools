@@ -7,5 +7,5 @@ setup(name='smtools',
       author_email='mhearne@usgs.gov',
       url='',
       packages=['smtools'],
-      scripts = ['getstrong.py','smcheck.py','getdyfi.py','cloneshake.py','createshake.py'],
+      scripts = ['getstrong.py','smcheck.py','getdyfi.py','cloneshake.py','createshake.py','filtertrace.py'],
 )
