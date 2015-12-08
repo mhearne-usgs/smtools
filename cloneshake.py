@@ -67,14 +67,7 @@ pgm2mi : GMICE
 
 source_network : us'''
 
-def readInfo(infourl):
-    try:
-        fh = urllib2.urlopen(infourl)
-        infoxml = fh.read()
-        fh.close()
-    except:
-        raise Exception,'The supplemental file %s does not exist.' % infourl
-    root = parseString(infoxml)
+def parseOldInfo(root):
     tags = root.getElementsByTagName('tag')
     faultfile = None
     gmpe = None
@@ -98,6 +91,43 @@ def readInfo(infourl):
             ipe = vparts[0].split('::')[2]
         if tag.getAttribute('name') == 'Vs30default':
             vs30 = int(tag.getAttribute('value'))
+    return (gmpe,ipe,gmice,vs30,faultfile)
+
+def parseInfo20(root):
+    faultfile = None
+    gmpe = None
+    ipe = None
+    gmice = None
+    vs30 = None
+    for section in root.getElementsByTagName('section'):
+        if section.getAttribute('name') == 'input':
+            for subsection in section.getElementsByTagName('subsection'):
+                if subsection.getAttribute('name') == 'event_information':
+                   faultfile = subsection.getElementsByTagName('faultfiles')[0].getAttribute('value').split(',')[0]
+        elif section.getAttribute('name') == 'processing':
+            for subsection in section.getElementsByTagName('subsection'):
+                if subsection.getAttribute('name') == 'ground_motion_modules':
+                    gmpe = subsection.getElementsByTagName('gmpe')[0].getAttribute('value')
+                    ipe = subsection.getElementsByTagName('ipe')[0].getAttribute('value')
+                    gmice = subsection.getElementsByTagName('mi2pgm')[0].getAttribute('value')
+                if subsection.getAttribute('name') == 'site_response':
+                    vs30 = float(subsection.getElementsByTagName('vs30default')[0].getAttribute('value'))
+    return (gmpe,ipe,gmice,vs30,faultfile)
+                 
+def readInfo(infourl):
+    try:
+        fh = urllib2.urlopen(infourl)
+        infoxml = fh.read()
+        fh.close()
+    except:
+        raise Exception,'The supplemental file %s does not exist.' % infourl
+    root = parseString(infoxml)
+    info = root.getElementsByTagName('info')[0]
+    if info.hasAttribute('version') and info.getAttribute('version') == '2.0':
+        gmpe,ipe,gmice,vs30,faultfile = parseInfo20(info)
+    else:
+        gmpe,ipe,gmice,vs30,faultfile = parseOldInfo(info)
+    
     root.unlink()
     return (gmpe,ipe,gmice,vs30,faultfile)
 
@@ -216,7 +246,8 @@ def getShakeURLs(shakeurl):
             faulturl = jdict['properties']['products']['shakemap'][0]['contents'][content]['url']
     return (infourl,faulturl,gridurl,stationurl)
     
-def main(shakeurl):
+def main(args):
+    shakeurl = args.url
     #remove any stuff after a # sign in the url
     if shakeurl.find('#') == -1:
         endidx = len(shakeurl)
@@ -227,10 +258,14 @@ def main(shakeurl):
         shakeurl += '/'
     #shakeurl: http://earthquake.usgs.gov/earthquakes/shakemap/ut/shake/shakeoutff_se/
     #http://earthquake.usgs.gov/earthquakes/shakemap/ut/shake/shakeoutff_se/download/info.xml
-    if sys.platform == 'darwin':
-        shakehome = '/opt/local/ShakeMap'
+    if args.shakehome:
+        shakehome = args.shakehome
     else:
-        shakehome = '/home/shake/ShakeMap'
+        shakehome = os.path.join(os.path.expanduser('~'),'ShakeMap')
+    if not os.path.isdir(shakehome):
+        msg = 'Could not find a ShakeMap installation at %s.  Specify the location of your ShakeMap installation with -s.'
+        print msg % (shakehome)
+        sys.exit(1)
     #Is this a scenario?
     if shakeurl.find('_se') > -1:
         infourl = urlparse.urljoin(shakeurl,'download/info.xml')
@@ -265,8 +300,10 @@ Examples:
     parser = argparse.ArgumentParser(description=desc,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('url', help='the URL of the desired ShakeMap.')
-    args = parser.parse_args()
-    if not args.url:
+    shakehome = os.path.join(os.path.expanduser('~'),'ShakeMap')
+    parser.add_argument('-s','--shakehome', help='the location of ShakeMap install (default is %s.' % shakehome)
+    pargs = parser.parse_args()
+    if not pargs.url:
         print parser.print_help()
         sys.exit(1)
-    main(args.url)
+    main(pargs)

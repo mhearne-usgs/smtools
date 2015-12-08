@@ -137,6 +137,7 @@ def main(args,config):
     #Those formats that need a parser object (like SAC data files need a dataless SEED file)
     #will fill in the parser object below.
     parser = None
+    seedresp = None
     datafiles = []
     if not args.inputFolder:
         if args.source == 'orfeus':
@@ -224,11 +225,24 @@ def main(args,config):
             datafiles = glob.glob(os.path.join(args.inputFolder,'*DAT'))
         elif args.source == 'sac':
             datafiles = glob.glob(os.path.join(args.inputFolder,'*.sac'))
+            if not len(datafiles):
+                datafiles = glob.glob(os.path.join(args.inputFolder,'*.pickle'))
             seedfiles = glob.glob(os.path.join(args.inputFolder,'*.seed'))
+            respfiles = glob.glob(os.path.join(args.inputFolder,'*.resp'))
             if not len(seedfiles):
-                print 'A dataless SEED file (ending in .seed) must be supplied with input SAC files. Exiting.'
-                sys.exit(1)
-            parser = Parser(seedfiles[0])
+                if not len(respfiles):
+                    print 'A dataless SEED file (ending in .seed) or a RESP file (ending in .resp) must be supplied with input SAC files. Exiting.'
+                    sys.exit(1)
+                else:
+                    seedresp = {'filename': respfiles[0],  # RESP filename
+                    # when using Trace/Stream.simulate() the "date" parameter can
+                    # also be omitted, and the starttime of the trace is then used.
+                    'date': obspy.UTCDateTime(etime),
+                    # Units to return response in ('DIS', 'VEL' or ACC)
+                    'units': 'ACC'
+                    }
+            else:
+                parser = Parser(seedfiles[0])
         elif args.source == 'unam':
             tdatafiles = glob.glob(os.path.join(args.inputFolder,'*')) #grab everything
             datafiles = []
@@ -285,7 +299,7 @@ def main(args,config):
             sys.exit(1)
     if len(datafiles):
         sys.stderr.write('Converting %i files to peak ground motion...\n' % len(datafiles))
-        stationfile,plotfiles,tag = trace2xml.trace2xml(traces,parser,outfolder,args.source,doPlot=args.doPlot)
+        stationfile,plotfiles,tag = trace2xml.trace2xml(traces,parser,outfolder,args.source,doPlot=args.doPlot,seedresp=seedresp)
         if args.debug:
             os.remove(stationfile)
             for pfile in plotfiles:
