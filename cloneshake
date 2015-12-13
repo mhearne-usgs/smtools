@@ -1,0 +1,490 @@
+#!/usr/bin/env python
+
+#stdlib imports
+import os.path
+import urllib2
+import urlparse
+from xml.dom.minidom import parseString
+import sys
+import StringIO
+import argparse
+import json
+import datetime
+from time import strptime
+import re
+
+YESNO = {'yes':'true','no':'false'}
+ARGBOOL = {'yes':True,'no':False}
+
+EVENT_TEMPLATE = '''<?xml version="1.0" encoding="US-ASCII" standalone="yes"?>
+<!DOCTYPE earthquake [
+<!ELEMENT  earthquake EMPTY>
+<!ATTLIST earthquake
+  id            ID      #REQUIRED
+  lat           CDATA   #REQUIRED
+  lon           CDATA   #REQUIRED
+  mag           CDATA   #REQUIRED
+  year          CDATA   #REQUIRED
+  month         CDATA   #REQUIRED
+  day           CDATA   #REQUIRED
+  hour          CDATA   #REQUIRED
+  minute        CDATA   #REQUIRED
+  second        CDATA   #REQUIRED
+  timezone      CDATA   #REQUIRED
+  depth         CDATA   #REQUIRED
+  type          CDATA   #REQUIRED
+  locstring     CDATA   #REQUIRED
+  pga           CDATA   #REQUIRED
+  pgv           CDATA   #REQUIRED
+  sp03          CDATA   #REQUIRED
+  sp10          CDATA   #REQUIRED
+  sp30          CDATA   #REQUIRED
+  created       CDATA   #REQUIRED
+>
+]>
+<earthquake id="[ID]" lat="[LAT]" lon="[LON]" mag="[MAG]" year="[YEAR]" month="[MONTH]" day="[DAY]" hour="[HOUR]" minute="[MINUTE]" second="[SECOND]" timezone="GMT" depth="[DEPTH]" locstring="[LOCSTRING]" created="[CREATED]" network="us" />'''
+
+GRIND_TEMPLATE = '''smVs30default : [VS30]
+bad_station : 8016 9.9 19990101-
+bad_station : 8010 9.9 19990101-
+bad_station : 8022 9.9 19990101-
+bad_station : 8034 9.9 19990101-
+bad_station : 8040 9.9 19990101-
+
+gmpe: [GMPE] 0.0 9.9 0 999
+ipe: [IPE] 0.0 9.9 0 999
+outlier_deviation_level : [OUTLIER_DEVIATION_LEVEL]
+outlier_max_mag         : [OUTLIER_MAX_MAG]
+
+qtm_file : [QTM_FILE] 
+
+latspan : [LATSPAN]
+lonspan : [LONSPAN]
+x_grid_interval : [X_GRID_INTERVAL]
+y_grid_interval : [Y_GRID_INTERVAL]
+
+use_gmpe_sc : [USE_GMPE_SC]
+
+bias_norm         : [BIAS_NORM]
+bias_max_range    : [BIAS_MAX_RANGE]
+bias_min_stations : [BIAS_MIN_STATIONS]
+bias_max_mag      : [BIAS_MAX_MAG]
+bias_max_bias     : [BIAS_MAX_BIAS]
+bias_min_bias     : [BIAS_MIN_BIAS]
+bias_log_amp      : [BIAS_LOG_AMP]
+
+gmdecay : [GMDECAY]
+gmroi : [GMROI]
+idecay : [IDECAY]
+iroi : [IROI]
+
+direct_patch_size : 1000
+mi2pgm : [MI2PGM]
+pgm2mi : [PGM2MI]
+
+source_network : us'''
+
+SOURCE_TEMPLATE = '''mech=[MECH]\n'''
+
+RUN_TEMPLATE = '''/Users/mhearne/ShakeMap/bin/../bin/zoneconfig2 -event [EVENT]
+/Users/mhearne/ShakeMap/bin/../bin/retrieve -event [EVENT]
+/Users/mhearne/ShakeMap/bin/../bin/grind -event [EVENT] [QTM] -xml -lonspan 6.0 -psa [DIRECTIVITY]
+/Users/mhearne/ShakeMap/bin/../bin/tag -event [EVENT]
+/Users/mhearne/ShakeMap/bin/../bin/mapping -event [EVENT] -timestamp -itopo
+/Users/mhearne/ShakeMap/bin/../bin/genex -event [EVENT] -zip -metadata -shape shape -shape hazus
+/Users/mhearne/ShakeMap/bin/../bin/transfer -event [EVENT] -www -push
+/Users/mhearne/ShakeMap/bin/../bin/setversion -event [EVENT] -savedata'''
+
+def parseOldInfo(root):
+    tags = root.getElementsByTagName('tag')
+    grind = {'vs30':686.0}
+    args = {'qtm':'True',
+            'directivity':False} #grind command line arguments
+    sources = {'mech':'ALL'}
+    faultfile = None
+    for tag in tags:
+        if tag.getAttribute('name') == 'faultfiles':
+            faultfile = tag.getAttribute('value')
+        if tag.getAttribute('name') == 'src_mech':
+            sources['mech'] = tag.getAttribute('value')
+
+        #things that will go in grind.conf
+        if tag.getAttribute('name') == 'pgm2mi':
+            value = tag.getAttribute('value')
+            vparts = value.split()
+            grind['pgm2mi'] = vparts[0].split('::')[2]
+        if tag.getAttribute('name') == 'mi2pgm':
+            value = tag.getAttribute('value')
+            vparts = value.split()
+            grind['mi2pgm'] = vparts[0].split('::')[2]
+        if tag.getAttribute('name') == 'GMPE':
+            value = tag.getAttribute('value')
+            vparts = value.split()
+            grind['gmpe'] = vparts[0].split('::')[2]
+        if tag.getAttribute('name') == 'IPE':
+            value = tag.getAttribute('value')
+            vparts = value.split()
+            grind['ipe'] = vparts[0].split('::')[2]
+        if tag.getAttribute('name') == 'Vs30default':
+            grind['vs30'] = tag.getAttribute('value')
+        if tag.getAttribute('name') == 'latspan':
+            grind['latspan'] = tag.getAttribute('value')
+        if tag.getAttribute('name') == 'lonspan':
+            grind['lonspan'] = tag.getAttribute('value')
+        if tag.getAttribute('name') == 'x_grid_interval':
+            grind['x_grid_interval'] = tag.getAttribute('value')
+        if tag.getAttribute('name') == 'y_grid_interval':
+            grind['y_grid_interval'] = tag.getAttribute('value')
+        if tag.getAttribute('name') == 'bias_log_amp':
+            grind['bias_log_amp'] = tag.getAttribute('value')
+        if tag.getAttribute('name') == 'outlier_deviation_level':
+            grind['outlier_deviation_level'] = tag.getAttribute('value')
+        if tag.getAttribute('name') == 'outlier_max_mag':
+            grind['outlier_max_mag'] = tag.getAttribute('value')
+        if tag.getAttribute('name') == 'gmdecay':
+            grind['gmdecay'] = tag.getAttribute('value')
+        if tag.getAttribute('name') == 'gmroi':
+            grind['gmroi'] = tag.getAttribute('value')
+        if tag.getAttribute('name') == 'idecay':
+            grind['idecay'] = tag.getAttribute('value')
+        if tag.getAttribute('name') == 'iroi':
+            grind['iroi'] = tag.getAttribute('value')
+        
+        #basin correction not in this format?
+        #site correction
+        if tag.getAttribute('name') == 'site_correction':
+            tvalue = tag.getAttribute('value')
+            if tvalue in ['disabled','none']:
+                args['qtm'] = False
+                grind['use_gmpe_sc'] = 'false'
+            if tvalue == 'GMPE native':
+                grind['use_gmpe_sc'] = 'true'
+                args['qtm'] = True
+            else:
+                grind['use_gmpe_sc'] = 'false'
+        if tag.getAttribute('name') == 'directivity':
+            args['directivity'] = ARGBOOL[tag.getAttribute('value')]
+
+        #get bias parameters
+        if tag.getAttribute('name') == 'bias_log_amp':
+            grind['bias_log_amp'] = YESNO[tag.getAttribute('value')]
+        if tag.getAttribute('name') == 'bias_max_bias':
+            grind['bias_max_bias'] = tag.getAttribute('value')
+        if tag.getAttribute('name') == 'bias_max_mag':
+            grind['bias_max_mag'] = tag.getAttribute('value')
+        if tag.getAttribute('name') == 'bias_max_range':
+            grind['bias_max_range'] = tag.getAttribute('value')
+        if tag.getAttribute('name') == 'bias_min_bias':
+            grind['bias_min_bias'] = tag.getAttribute('value')
+        if tag.getAttribute('name') == 'bias_norm':
+            grind['bias_norm'] = tag.getAttribute('value')
+        if tag.getAttribute('name') == 'bias_min_stations':
+            grind['bias_min_stations'] = tag.getAttribute('value')
+        
+    return (grind,args,sources,faultfile)
+
+def parseInfo20(root):
+    grind = {'vs30':686.0}
+    args = {'qtm':'True',
+            'directivity':False} #grind command line arguments
+    sources = {'mech':'ALL'}
+    faultfile = None
+    lat = None
+    lon = None
+    for section in root.getElementsByTagName('section'):
+        if section.getAttribute('name') == 'input':
+            for subsection in section.getElementsByTagName('subsection'):
+                if subsection.getAttribute('name') == 'event_information':
+                   faultfile = subsection.getElementsByTagName('faultfiles')[0].getAttribute('value').split(',')[0]
+                   lat = float(subsection.getElementsByTagName('latitude')[0].getAttribute('value'))
+                   lon = float(subsection.getElementsByTagName('longitude')[0].getAttribute('value'))
+        elif section.getAttribute('name') == 'processing':
+            for subsection in section.getElementsByTagName('subsection'):
+                if subsection.getAttribute('name') == 'ground_motion_modules':
+                    grind['gmpe'] = subsection.getElementsByTagName('gmpe')[0].getAttribute('value')
+                    grind['ipe'] = subsection.getElementsByTagName('ipe')[0].getAttribute('value')
+                    grind['mi2pgm'] = subsection.getElementsByTagName('mi2pgm')[0].getAttribute('value')
+                    grind['pgm2mi'] = subsection.getElementsByTagName('pgm2mi')[0].getAttribute('value')
+                    args['directivity'] = ARGBOOL[subsection.getElementsByTagName('directivity')[0].getAttribute('value')]
+                if subsection.getAttribute('name') == 'site_response':
+                    vs30 = subsection.getElementsByTagName('vs30default')[0].getAttribute('value')
+                    scvalue = subsection.getElementsByTagName('site_correction')[0].getAttribute('value')
+                    if scvalue in ['disabled','none']:
+                        args['qtm'] = False
+                        grind['use_gmpe_sc'] = 'true'
+                    if scvalue == 'GMPE native':
+                        grind['use_gmpe_sc'] = 'true'
+                        args['qtm'] = True
+                    else:
+                        grind['use_gmpe_sc'] = 'false'
+                if subsection.getAttribute('name') == 'miscellaneous':
+                    grind['bias_log_amp'] = YESNO[subsection.getElementsByTagName('bias_log_amp')[0].getAttribute('value')]
+                    grind['bias_max_bias'] = subsection.getElementsByTagName('bias_max_bias')[0].getAttribute('value')
+                    grind['bias_max_mag'] = subsection.getElementsByTagName('bias_max_bias')[0].getAttribute('value')
+                    grind['bias_max_range'] = subsection.getElementsByTagName('bias_max_range')[0].getAttribute('value')
+                    grind['bias_min_bias'] = subsection.getElementsByTagName('bias_min_bias')[0].getAttribute('value')
+                    grind['bias_min_stations'] = subsection.getElementsByTagName('bias_min_stations')[0].getAttribute('value')
+                    grind['bias_norm'] = subsection.getElementsByTagName('bias_norm')[0].getAttribute('value')
+                    if subsection.getElementsByTagName('median_dist')[0].getAttribute('value') == 'no':
+                        args['nomedian'] = 'true'
+                    grind['outlier_deviation_level'] = subsection.getElementsByTagName('outlier_deviation_level')[0].getAttribute('value')
+                    grind['outlier_max_mag'] = subsection.getElementsByTagName('outlier_max_mag')[0].getAttribute('value')
+                if subsection.getAttribute('name') == 'roi':
+                    grind['gmdecay'] = subsection.getElementsByTagName('gmdecay')[0].getAttribute('value')
+                    grind['gmroi'] = subsection.getElementsByTagName('gmroi')[0].getAttribute('value')
+                    grind['idecay'] = subsection.getElementsByTagName('idecay')[0].getAttribute('value')
+                    grind['iroi'] = subsection.getElementsByTagName('iroi')[0].getAttribute('value')
+        elif section.getAttribute('name') == 'output':
+            for subsection in section.getElementsByTagName('subsection'):
+                if subsection.getAttribute('name') == 'map_information':
+                    grind['latspan'] = subsection.getElementsByTagName('latspan')[0].getAttribute('value')
+                    grind['lonspan'] = subsection.getElementsByTagName('lonspan')[0].getAttribute('value')
+                    grind['x_grid_interval'] = subsection.getElementsByTagName('x_grid_interval')[0].getAttribute('value')
+                    grind['y_grid_interval'] = subsection.getElementsByTagName('y_grid_interval')[0].getAttribute('value')
+                    #set the strictbound attribute with lat_min,lat_max, etc. values if the hypocenter is not approximately centered
+                    if lat is not None:
+                        ymin = float(subsection.getElementsByTagName('lat_min')[0].getAttribute('value'))
+                        ymax = float(subsection.getElementsByTagName('lat_max')[0].getAttribute('value'))
+                        xmin = float(subsection.getElementsByTagName('lon_min')[0].getAttribute('value'))
+                        xmax = float(subsection.getElementsByTagName('lon_max')[0].getAttribute('value'))
+                        x1p = lon/100.0
+                        y1p = lat/100.0
+                        ycenter = ymin + (ymax-ymin)/2.0
+                        xcenter = xmin + (xmax-xmin)/2.0
+                        if xcenter > lon-x1p and xcenter < lon+x1p and ycenter > lat-y1p and ycenter < lat+y1p:
+                            pass
+                        else:
+                            grind['strictbound'] = '%.4f %.4f %.4f %.4f' % (xmin,ymin,xmax,ymax)
+                    
+    return (grind,args,sources,faultfile)
+                 
+def readInfo(infourl):
+    try:
+        fh = urllib2.urlopen(infourl)
+        infoxml = fh.read()
+        fh.close()
+    except:
+        raise Exception,'The supplemental file %s does not exist.' % infourl
+    root = parseString(infoxml)
+    info = root.getElementsByTagName('info')[0]
+    if info.hasAttribute('version') and info.getAttribute('version') == '2.0':
+        grind,args,sources,faultfile = parseInfo20(info)
+    else:
+        grind,args,sources,faultfile = parseOldInfo(info)
+    
+    root.unlink()
+    return (grind,args,sources,faultfile)
+
+def getEventInfo(gridurl):
+    gridfh = urllib2.urlopen(gridurl)
+    gdata = gridfh.read()
+    gridfh.close()
+
+    gdata = gdata[0:gdata.find('<grid_data>')] + '</shakemap_grid>'
+    xdom = parseString(gdata)
+    root = xdom.getElementsByTagName('shakemap_grid')[0]
+    infodict = {}
+    infodict['id'] = root.getAttribute('event_id')
+    event = root.getElementsByTagName('event')[0]
+    infodict['lat'] = float(event.getAttribute('lat'))
+    infodict['lon'] = float(event.getAttribute('lon'))
+    infodict['depth'] = float(event.getAttribute('depth'))
+    infodict['mag'] = float(event.getAttribute('magnitude'))
+    timestr = event.getAttribute('event_timestamp')
+    timestr = timestr[0:19]
+    time = datetime.datetime(*strptime(timestr,"%Y-%m-%dT%H:%M:%S")[0:6])
+    infodict['locstring'] = event.getAttribute('event_description')
+    infodict['year'] = time.year
+    infodict['month'] = time.month
+    infodict['day'] = time.day
+    infodict['hour'] = time.hour
+    infodict['minute'] = time.minute
+    infodict['second'] = time.second
+    ctimestr = root.getAttribute('process_timestamp')
+    ctimestr = ctimestr[0:19]
+    ctime = datetime.datetime(*strptime(ctimestr,"%Y-%m-%dT%H:%M:%S")[0:6])
+    infodict['created'] = ctime.strftime('%s')
+    root.unlink()
+    return infodict
+
+def writeEvent(grind,args,sources,faultfile,faulturl,stationurl,eventdict,shakehome):
+    #write the event.xml file
+    datadir = os.path.join(shakehome,'data',eventdict['id'])
+    inputdir = os.path.join(datadir,'input')
+    confdir = os.path.join(datadir,'config')
+    if not os.path.isdir(inputdir):
+        os.makedirs(inputdir)
+    if not os.path.isdir(confdir):
+        os.makedirs(confdir)
+
+    #write grind.conf file
+    grindfile = os.path.join(confdir,'grind.conf')
+
+    #get the location of the qtm file on this system
+    grindfile = os.path.join(shakehome,'config','grind.conf')
+    lines = open(grindfile,'rt').readlines()
+    for line in lines:
+        if line.find('qtm_file') > -1 and not line.strip().startswith('#'):
+            grind['qtm_file'] = line.split(':')[1]
+            break
+    
+    gstr = GRIND_TEMPLATE
+    for key,value in grind.iteritems():
+        gstr = gstr.replace('['+key.upper()+']',str(value))
+    #make sure we replaced all the macros
+    pat = '\[([^]]+)\]'
+    unfilled = re.findall(pat,gstr)
+    if len(unfilled):
+        print 'Did not fill in all macros with values, missing "%s".' % str(unfilled)
+        sys.exit(1)
+    f = open(grindfile,'wt')    
+    f.write(gstr)
+    f.close()
+        
+    #write event.xml file
+    eventfile = os.path.join(inputdir,'event.xml')
+    f = open(eventfile,'wt')
+    estr = EVENT_TEMPLATE
+    for key,value in eventdict.iteritems():
+        estr = estr.replace('['+key.upper()+']',str(value))
+    f.write(estr)
+    f.close()
+    print 'Writing input file to %s' % eventfile
+
+    #write stationlist.xml file (if it exists)
+    try:
+        fh = urllib2.urlopen(stationurl)
+        data = fh.read()
+        fh.close()
+        datafile = os.path.join(inputdir,'stationlist.xml')
+        f = open(datafile,'wt')
+        f.write(data)
+        f.close()
+    except:
+        print 'No stationlist file found.'
+    
+    #write fault file
+    try:
+        fh = urllib2.urlopen(faulturl)
+        parts = urlparse.urlparse(faulturl)
+        fpath = parts.path
+        fbase,fname = os.path.split(fpath)
+        faultfile = os.path.join(inputdir,fname)
+        data = fh.read()
+        fh.close()
+        f = open(faultfile,'wt')
+        f.write(data)
+        f.close()
+        print 'Writing fault file to %s' % faultfile
+    except:
+        print 'No fault file found.'
+
+    #Write sources.txt file
+    sourcefile = os.path.join(inputdir,'source.txt')
+    f = open(sourcefile,'wt')
+    for key,value in sources.iteritems():
+        f.write('%s = %s\n' % (key,value))
+    f.close()
+
+    #write run script
+    runfile = os.path.join(datadir,'RUNFILE.sh')
+    f = open(runfile,'wt')
+    runtext = RUN_TEMPLATE.replace('[EVENT]',eventdict['id'])
+    if args['qtm']:
+        runtext = runtext.replace('[QTM]','-qtm')
+    else:
+        runtext = runtext.replace('[QTM]','')
+    if args['directivity']:
+        runtext = runtext.replace('[DIRECTIVITY]','-directivity')
+    else:
+        runtext = runtext.replace('[DIRECTIVITY]','')
+    f.write(runtext)
+    f.close()
+    
+    print 'Writing grind config to %s' % grindfile
+
+def getShakeURLs(shakeurl):
+    urlt = 'http://earthquake.usgs.gov/fdsnws/event/1/query?eventid=[EVENTID]&format=geojson'
+    eventid = urlparse.urlparse(shakeurl).path.strip('/').split('/')[-1]
+    url = urlt.replace('[EVENTID]',eventid)
+    fh = urllib2.urlopen(url)
+    data = fh.read()
+    jdict = json.loads(data)
+    fh.close()
+    contentlist = jdict['properties']['products']['shakemap'][0]['contents'].keys()
+    infourl = None
+    gridurl = None
+    stationurl = None
+    faulturl = None
+    for content in contentlist:
+        if content.find('info.xml') > -1:
+            infourl = jdict['properties']['products']['shakemap'][0]['contents'][content]['url']
+        if content.endswith('grid.xml'):
+            gridurl = jdict['properties']['products']['shakemap'][0]['contents'][content]['url']
+        if content.find('stationlist.xml') > -1:
+            stationurl = jdict['properties']['products']['shakemap'][0]['contents'][content]['url']
+        if content.find('_fault.txt') > -1:
+            faulturl = jdict['properties']['products']['shakemap'][0]['contents'][content]['url']
+    return (infourl,faulturl,gridurl,stationurl)
+    
+def main(args):
+    shakeurl = args.url
+    #remove any stuff after a # sign in the url
+    if shakeurl.find('#') == -1:
+        endidx = len(shakeurl)
+    else:
+        endidx = shakeurl.find('#')
+    shakeurl = shakeurl[0:endidx]
+    if not shakeurl.endswith('/'):
+        shakeurl += '/'
+    #shakeurl: http://earthquake.usgs.gov/earthquakes/shakemap/ut/shake/shakeoutff_se/
+    #http://earthquake.usgs.gov/earthquakes/shakemap/ut/shake/shakeoutff_se/download/info.xml
+    if args.shakehome:
+        shakehome = args.shakehome
+    else:
+        shakehome = os.path.join(os.path.expanduser('~'),'ShakeMap')
+    if not os.path.isdir(shakehome):
+        msg = 'Could not find a ShakeMap installation at %s.  Specify the location of your ShakeMap installation with -s.'
+        print msg % (shakehome)
+        sys.exit(1)
+    #Is this a scenario?
+    if shakeurl.find('_se') > -1:
+        infourl = urlparse.urljoin(shakeurl,'download/info.xml')
+        gridurl = urlparse.urljoin(shakeurl,'download/grid.xml')
+        stationurl = urlparse.urljoin(shakeurl,'download/stationlist.xml')
+        try:
+            grind,args,sources,faultfile = readInfo(infourl)
+        except Exception,error:
+            print 'There was a problem trying to clone the ShakeMap.\nError message:\n"%s".\nExiting.' % error.message
+            sys.exit(1)
+        faulturl = urlparse.urljoin(shakeurl,'download/%s' % faultfile)
+    else:
+        infourl,faulturl,gridurl,stationurl = getShakeURLs(shakeurl)
+        grind,args,sources,faultfile = readInfo(infourl)
+    
+    eventdict = getEventInfo(gridurl)
+    writeEvent(grind,args,sources,faultfile,faulturl,stationurl,eventdict,shakehome)
+    print 'Cloning completed.\nTo run this event, do:\nsh %s/data/%s/RUNFILE.sh' % (shakehome,eventdict['id'])
+    
+
+if __name__ == '__main__':
+    desc = '''Clone a ShakeMap from NEIC web site.
+    
+Examples:
+
+    Cloning a scenario:
+    %(prog)s http://earthquake.usgs.gov/earthquakes/shakemap/global/shake/capstone2014_nmsw_m7.7_se/
+
+    Cloning a real-time event:
+    %(prog)s http://comcat.cr.usgs.gov/earthquakes/eventpage/usb000slwn#summary
+    '''
+    parser = argparse.ArgumentParser(description=desc,
+                                     formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument('url', help='the URL of the desired ShakeMap.')
+    shakehome = os.path.join(os.path.expanduser('~'),'ShakeMap')
+    parser.add_argument('-s','--shakehome', help='the location of ShakeMap install (default is %s.' % shakehome)
+    pargs = parser.parse_args()
+    if not pargs.url:
+        print parser.print_help()
+        sys.exit(1)
+    main(pargs)
