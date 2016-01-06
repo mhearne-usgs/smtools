@@ -52,6 +52,7 @@ def readchile(ascfile):
             elif line.startswith('# Estacion'):
                 parts = line.split(':')
                 hdrdict['station'] = parts[1].strip()
+                hdrdict['channel'] = parts[2].strip()
                 continue
             elif line.startswith('# Componente'):
                 parts = line.split(':')
@@ -79,7 +80,7 @@ def readchile(ascfile):
     hdrdict['calib'] = calib
     hdrdict['delta'] = 1.0/hdrdict['sampling_rate']
     hdrdict['duration'] = hdrdict['starttime'] + hdrdict['delta']*hdrdict['npts']
-    hdrdict['network'] = 'CL'
+    hdrdict['network'] = 'C1' #chile doesn't put network in their headers, so we have to guess here.  C1 is the right answer sometimes.
     hdrdict['units'] = 'acc'
     hdrdict['height'] = 0.0
     stats = Stats(hdrdict)

@@ -158,15 +158,16 @@ def trace2xml(traces,parser,outfolder,netsource,doPlot=False,seedresp=None):
             trace.simulate(paz_remove=paz,remove_sensitivity=True,simulate_sensitivity=False)
             trace.stats['units'] = 'acc' #ASSUMING THAT ANY SAC DATA IS ACCELERATION!
         else:
-            if seedresp is None:
-                raise Exception('Must have a PolesAndZeros data structure (i.e., from dataless SEED) or a RESP file.')
-            else:
-                pre_filt = (0.01, 0.02, 20, 30)
-                try:
-                    trace.simulate(paz_remove=None, pre_filt=pre_filt, seedresp=seedresp)
-                except Exception,error:
-                    pass
-            
+            if trace.stats['units'] != 'acc':
+                if seedresp is None:
+                    raise Exception('Must have a PolesAndZeros data structure (i.e., from dataless SEED) or a RESP file.')
+                else:
+                    pre_filt = (0.01, 0.02, 20, 30)
+                    try:
+                        trace.simulate(paz_remove=None, pre_filt=pre_filt, seedresp=seedresp)
+                    except Exception,error:
+                        pass
+
         #make the component tag to hold the measurements
         comptag = Tag('comp',attributes={'name':channel})
         if trace.stats['units'] == 'acc':
