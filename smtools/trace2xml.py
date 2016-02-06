@@ -88,26 +88,22 @@ def amps2xml(stationlist,outfolder,netsource):
                                                'loc':name})
         for channelkey,channeldict in channels.iteritems():
             comptag = Tag('comp',attributes={'name':channelkey})
-            pga = channeldict['pga']
-            pgv = channeldict['pgv']
-            psa03 = channeldict['psa03']
-            psa10 = channeldict['psa10']
-            psa30 = channeldict['psa30']
-            psa03tag = Tag('psa03',attributes={'value':psa03})
-            psa10tag = Tag('psa10',attributes={'value':psa10})
-            psa30tag = Tag('psa30',attributes={'value':psa30})
-            acctag = Tag('acc',attributes={'value':pga})
-            veltag = Tag('vel',attributes={'value':pgv})
-            comptag.addChild(acctag)
-            comptag.addChild(veltag)
-            comptag.addChild(psa03tag)
-            comptag.addChild(psa10tag)
-            comptag.addChild(psa30tag)
+            for key in ['pga','pgv','psa03','psa10','psa30']:
+                if channels.has_key(key):
+                    channelvalue = channeldict[key]
+                    if key == 'pga':
+                        tkey = 'acc'
+                    elif key == 'pgv':
+                        tkey = 'vel'
+                    else:
+                        tkey = key
+                    channeltag = Tag(tkey,attributes={'value':channelvalue})
+                    comptag.addChild(channeltag)
+
             stationtag.addChild(comptag)
         stationlist_tag.addChild(stationtag)
 
     outfile = os.path.join(outfolder,'%s_dat.xml' % netsource)
-    print 'Saving to %s' % outfile
     stationlist_tag.renderToXML(filename=outfile,ntabs=1)
     return (outfile,stationlist_tag)
             
