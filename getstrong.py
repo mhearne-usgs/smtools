@@ -220,7 +220,7 @@ def main(args,config):
         elif args.source == 'pickle':
             datafiles = glob.glob(os.path.join(args.inputFolder,'*.pickle'))
         elif args.source == 'iris':
-            datafiles = glob.glob(os.path.join(args.inputFolder,'*.pickle'))
+            datafiles = glob.glob(os.path.join(args.inputFolder,'*.sac'))
         elif args.source == 'italy':
             datafiles = glob.glob(os.path.join(args.inputFolder,'*DAT'))
         elif args.source == 'sac':

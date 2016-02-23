@@ -146,8 +146,13 @@ def trace2xml(traces,parser,outfolder,netsource,doPlot=False,seedresp=None):
                                'longitude':trace.stats['lon'],
                                'elevation':trace.stats['height']}
             except:
-                sys.stderr.write('Could not get station coordinates from trace object of station %s\n' % station)
-                continue
+                try:
+                    coordinates = {'latitude':trace.stats['coordinates']['latitude'],
+                                   'longitude':trace.stats['coordinates']['longitude'],
+                                   'elevation':trace.stats['coordinates']['elevation']}
+                except:
+                    sys.stderr.write('Could not get station coordinates from trace object of station %s\n' % station)
+                    continue
 
         #If we have separate calibration data, apply it here
         if parser is not None:

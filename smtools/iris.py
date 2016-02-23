@@ -16,8 +16,12 @@ from obspy.core.util import NamedTemporaryFile
 from obspy import UTCDateTime
 from obspy.core.util import geodetics
 
+#Kate's IRIS data fetcher code
+from reviewData import reviewData
+
 #local imports
 from fetcher import StrongMotionFetcher,StrongMotionFetcherException
+from trace2xml import trace2xml
 
 TIMEFMT = '%Y-%m-%dT%H:%M:%S'
 RADIUS = 3.6 #degrees within which to search for stations
@@ -42,7 +46,7 @@ def parseSAC(sacpz):
 class IrisFetcher(StrongMotionFetcher):
     def __init__(self,verbose=False):
         self.verbose = verbose
-    
+
     def fetch(self,lat,lon,etime,radius,timewindow,outfolder):
         """
         Retrieve all strong motion data record files associated with an event.
@@ -54,87 +58,50 @@ class IrisFetcher(StrongMotionFetcher):
         @param outfolder: Folder where retrieved strong motion mini-SEED data files should be written.
         @return: List of strong motion mini-SEED data files.
         """
-        client = Client("IRIS")
-        etime = UTCDateTime(etime)
-        inventory = client.get_stations(latitude=lat, longitude=lon,maxradius=RADIUS,
-                                        starttime=etime,endtime=etime+300,level='channel')
-        irisclient = IrisClient()
-        datafiles = []
-        for channel in inventory.get_contents()['channels']:
-            n,s,l,c = channel.split('.')
-            isAcc = c.startswith('HL') or c.startswith('HN') or c.startswith('BN') or c.startswith('VN')
-            isBroadband = not isAcc and c.startswith('B')
-            if isAcc or isBroadband:
-                try:
-                    sacpz = irisclient.sacpz(n,s,l,c)
-                except Exception,msg:
-                    if self.verbose:
-                        sys.stderr.write('Error retrieving coordinates for %s: "%s"\n' % (channel,str(msg)))
-                    continue
-                sacdict = parseSAC(sacpz)
-                slat = float(sacdict['LATITUDE'])
-                slon = float(sacdict['LONGITUDE'])
-                sheight = float(sacdict['ELEVATION'])
+        etimestr = etime.strftime('%Y-%m-%dT%H:%M:%S')
+        st = reviewData.getepidata(lat, lon, etimestr, tstart=-3,
+                                   tend=+timewindow, minradiuskm=0., maxradiuskm=radius,
+                                   channels='strong motion', location='*', source='IRIS')
+        seedfiles = []
+        if st is not None:
+            stacc,stvel = reviewData.getpeaks(st,pga=False,pgv=False,psa=False)
+            for trace in stacc:
+                isAcc = trace.stats['processing'][-1].lower().find('acc') > -1
+                if not isAcc:
+                    continue #skip if this isn't an acceleration record
+                nscl = '%s_%s_%s_%s.sac' % (trace.stats['network'],trace.stats['station'],
+                                             trace.stats['channel'],trace.stats['location'])
+                seedfile = os.path.join(outfolder,nscl)
+                trace.stats['sac'] = {}
+                trace.stats['sac']['stla'] = trace.stats['coordinates']['latitude']
+                trace.stats['sac']['stlo'] = trace.stats['coordinates']['longitude']
+                trace.stats['sac']['stel'] = trace.stats['coordinates']['elevation']
+                trace.write(seedfile,format='SAC')
+                seedfiles.append(seedfile)
+        return seedfiles
 
-                #figure out a time window for this event
-                #assume that waves are traveling at 1 km/sec
-                distance,az,backaz = geodetics.gps2DistAzimuth(lat, lon, slat, slon)
-                distance /= 1000.0
-                elapsed = distance/WAVERATE #result in seconds
-                endtime = etime + elapsed + 300
-                try:
-                    st = client.get_waveforms(n,s,l,c, etime, endtime)
-                except Exception,msg:
-                    if self.verbose:
-                        sys.stderr.write('Error retrieving waveforms for %s: "%s"\n' % (channel,str(msg)))
-                    continue
-                if self.verbose:
-                    sys.stderr.write('Retrieving data for station %s... %.1f km distance\n' % (channel,distance))
-                trace = st[0]
-                tf = NamedTemporaryFile()
-                respf = tf.name
-                try:
-                    irisclient.resp(n,s,l,c,filename=respf)
-                except Exception,msg:
-                    if self.verbose:
-                        sys.stderr.write('Error retrieving response information for channel %s: "%s"\n' % (channel,str(msg)))
-                    continue
-                trace.stats['lat'] = slat
-                trace.stats['lon'] = slon
-                trace.stats['height'] = sheight
-                tf.close()
-                if isAcc:
-                    units = 'ACC'
-                else:
-                    units = 'VEL'
-                seedresp = {'filename': respf,  # RESP filename
-                             # Units to return response in ('DIS', 'VEL' or ACC)
-                             'units': units
-                             }
-                trace.stats['units'] = units.lower()
-                #apply the calibration
-                try:
-                    trace.simulate(paz_remove=None,seedresp=seedresp) #now in m/s^2 or m/s
-                except Exception,msg:
-                    if self.verbose:
-                        sys.stderr.write('Error calibrating channel %s: "%s"\n' % (channel,str(msg)))
-                    continue
-
-                #save as a Python pickle file since that preserves the lat/lon/height data
-                pclfilename = os.path.join(outfolder,'%s.pickle' % (channel))
-                pclfile = open(pclfilename,'wb')
-                pickle.dump(st,pclfile)
-                pclfile.close()
-                datafiles.append(pclfilename)
-
-        return datafiles
-
-def readiris(seedfile): #trivial, since we saved as a Python pickle
-    return read(seedfile)[0] #return the trace from the stream object that gets created
-
+def readiris(seedfile): #trivial, since we saved as a seed file
+    trace = read(seedfile)[0]
+    #stuff the coordinates back into the main stats dict
+    trace.stats['lat'] = trace.stats['sac']['stla']
+    trace.stats['lon'] = trace.stats['sac']['stlo']
+    trace.stats['height'] = trace.stats['sac']['stel']
+    trace.stats['units'] = 'acc'
+    return trace
+    
 if __name__ == '__main__':
-    ifetch = IrisBroadFetcher()
-    dfiles = ifetch.fetch(35.532,-96.765,datetime.datetime(2011,11,06,03,53,10),None,None,'/Users/mhearne/tmp/iris')
-        
+    ifetch = IrisFetcher()
+    #
+    lat = 22.83
+    lon = 120.625
+    etime = datetime.datetime(2016,2,5,19,57,26)
+    outfolder = '/Users/mhearne/tmp/iris'
+    dfiles = ifetch.fetch(lat,lon,etime,300,400,outfolder)
+    traces = []
+    for dfile in dfiles:
+        trace = readiris(dfile)
+        traces.append(trace)
+    
+    trace2xml(traces,None,outfolder,'IR')
 
     
