@@ -95,6 +95,50 @@ RUN_TEMPLATE = '''/Users/mhearne/ShakeMap/bin/../bin/zoneconfig2 -event [EVENT]
 /Users/mhearne/ShakeMap/bin/../bin/transfer -event [EVENT] -www -push
 /Users/mhearne/ShakeMap/bin/../bin/setversion -event [EVENT] -savedata'''
 
+def parseJSONInfo(jsondata):
+    jdict = json.loads(jsondata)
+    faultfile = jdict['input']['event_information']['faultfiles']
+    sources = {'mech':jdict['input']['event_information']['src_mech']}
+    grind = {}
+    args = {}
+    args['directivity'] = jdict['processing']['ground_motion_modules']['directivity']['module']
+    grind['basin_module'] = jdict['processing']['ground_motion_modules']['basin_correction']['module']
+    grind['mi2pgm'] = jdict['processing']['ground_motion_modules']['mi2pgm']['module']
+    grind['ipe'] = jdict['processing']['ground_motion_modules']['ipe']['module']
+    grind['gmpe'] = jdict['processing']['ground_motion_modules']['gmpe']['module']
+    grind['pgm2mi'] = jdict['processing']['ground_motion_modules']['pgm2mi']['module']
+    grind['use_gmpe_sc'] = 'false'
+    args['qtm'] = 'false'
+    if jdict['processing']['site_response']['site_correction'] == 'GMPE native':
+        grind['use_gmpe_sc'] = 'true'
+        args['qtm'] = True
+    grind['vs30'] = jdict['processing']['site_response']['vs30default']
+    grind['bias_max_range'] = jdict['processing']['miscellaneous']['bias_max_range']
+    grind['outlier_max_mag'] = jdict['processing']['miscellaneous']['outlier_max_mag']
+    grind['bias_max_bias'] = jdict['processing']['miscellaneous']['bias_max_bias']
+    grind['bias_min_bias'] = jdict['processing']['miscellaneous']['bias_min_bias']
+    grind['bias_max_mag'] = jdict['processing']['miscellaneous']['bias_max_mag']
+    grind['bias_norm'] = jdict['processing']['miscellaneous']['bias_norm']
+    grind['bias_log_amp'] = jdict['processing']['miscellaneous']['bias_log_amp']
+    grind['outlier_deviation_level'] = jdict['processing']['miscellaneous']['outlier_deviation_level']
+    grind['bias_min_stations'] = jdict['processing']['miscellaneous']['bias_min_stations']
+    grind['gmroi'] = jdict['processing']['roi']['gm']['roi']
+    grind['gmdecay'] = jdict['processing']['roi']['gm']['decay']
+    grind['iroi'] = jdict['processing']['roi']['intensity']['roi']
+    grind['idecay'] = jdict['processing']['roi']['intensity']['decay']
+    grind['latspan'] = float(jdict['output']['map_information']['grid_span']['latitude'])
+    grind['lonspan'] = float(jdict['output']['map_information']['grid_span']['longitude'])
+    nx = jdict['output']['map_information']['grid_points']['longitude']
+    ny = jdict['output']['map_information']['grid_points']['latitude']
+    grind['x_grid_interval'] = grind['lonspan']/nx
+    grind['y_grid_interval'] = grind['latspan']/ny
+
+    args['nomedian'] = 'false'
+    if jdict['processing']['miscellaneous']['median_dist'] == 'yes':
+        args['nomedian'] = 'true'
+    
+    return (grind,args,sources,faultfile)
+
 def parseOldInfo(root):
     tags = root.getElementsByTagName('tag')
     grind = {'vs30':686.0}
@@ -265,14 +309,20 @@ def readInfo(infourl):
         fh.close()
     except:
         raise Exception,'The supplemental file %s does not exist.' % infourl
-    root = parseString(infoxml)
-    info = root.getElementsByTagName('info')[0]
-    if info.hasAttribute('version') and info.getAttribute('version') == '2.0':
-        grind,args,sources,faultfile = parseInfo20(info)
-    else:
-        grind,args,sources,faultfile = parseOldInfo(info)
     
-    root.unlink()
+    if infourl.endswith('.xml'):
+        root = parseString(infoxml)
+        info = root.getElementsByTagName('info')[0]
+        if info.hasAttribute('version') and info.getAttribute('version') == '2.0':
+            grind,args,sources,faultfile = parseInfo20(info)
+        else:
+            grind,args,sources,faultfile = parseOldInfo(info)
+        root.unlink()
+    elif infourl.endswith('.json'):
+        grind,args,sources,faultfile = parseJSONInfo(infoxml)
+    else:
+        raise Exception('The supplemental file %s is in an unknown format.' % infourl)
+    
     return (grind,args,sources,faultfile)
 
 def getEventInfo(gridurl):
@@ -418,6 +468,8 @@ def getShakeURLs(shakeurl):
     faulturl = None
     for content in contentlist:
         if content.find('info.xml') > -1:
+            infourl = jdict['properties']['products']['shakemap'][0]['contents'][content]['url']
+        if content.find('info.json') > -1:
             infourl = jdict['properties']['products']['shakemap'][0]['contents'][content]['url']
         if content.endswith('grid.xml'):
             gridurl = jdict['properties']['products']['shakemap'][0]['contents'][content]['url']
