@@ -368,28 +368,30 @@ def writeEvent(grind,args,sources,faultfile,faulturl,stationurl,eventdict,shakeh
         os.makedirs(confdir)
 
     #write grind.conf file
-    grindfile = os.path.join(confdir,'grind.conf')
-
-    #get the location of the qtm file on this system
-    grindfile = os.path.join(shakehome,'config','grind.conf')
-    lines = open(grindfile,'rt').readlines()
-    for line in lines:
-        if line.find('qtm_file') > -1 and not line.strip().startswith('#'):
-            grind['qtm_file'] = line.split(':')[1]
-            break
+    if len(grind):
+        #get the location of the qtm file on this system
+        grindfile = os.path.join(shakehome,'config','grind.conf')
+        lines = open(grindfile,'rt').readlines()
+        for line in lines:
+            if line.find('qtm_file') > -1 and not line.strip().startswith('#'):
+                grind['qtm_file'] = line.split(':')[1]
+                break
     
-    gstr = GRIND_TEMPLATE
-    for key,value in grind.iteritems():
-        gstr = gstr.replace('['+key.upper()+']',str(value))
-    #make sure we replaced all the macros
-    pat = '\[([^]]+)\]'
-    unfilled = re.findall(pat,gstr)
-    if len(unfilled):
-        print 'Did not fill in all macros with values, missing "%s".' % str(unfilled)
-        sys.exit(1)
-    f = open(grindfile,'wt')    
-    f.write(gstr)
-    f.close()
+        gstr = GRIND_TEMPLATE
+        for key,value in grind.iteritems():
+            gstr = gstr.replace('['+key.upper()+']',str(value))
+        #make sure we replaced all the macros
+        pat = '\[([^]]+)\]'
+        unfilled = re.findall(pat,gstr)
+        if len(unfilled):
+            print 'Did not fill in all macros with values, missing "%s".' % str(unfilled)
+            sys.exit(1)
+        f = open(grindfile,'wt')    
+        f.write(gstr)
+        f.close()
+        print 'Writing grind config to %s' % grindfile
+    else:
+        print 'No grind information found.'
         
     #write event.xml file
     eventfile = os.path.join(inputdir,'event.xml')
@@ -440,18 +442,18 @@ def writeEvent(grind,args,sources,faultfile,faulturl,stationurl,eventdict,shakeh
     runfile = os.path.join(datadir,'RUNFILE.sh')
     f = open(runfile,'wt')
     runtext = RUN_TEMPLATE.replace('[EVENT]',eventdict['id'])
-    if args['qtm']:
+    if args.has_key('qtm') and args['qtm']:
         runtext = runtext.replace('[QTM]','-qtm')
     else:
         runtext = runtext.replace('[QTM]','')
-    if args['directivity']:
+    if args.has_key('directivity') and args['directivity']:
         runtext = runtext.replace('[DIRECTIVITY]','-directivity')
     else:
         runtext = runtext.replace('[DIRECTIVITY]','')
     f.write(runtext)
     f.close()
     
-    print 'Writing grind config to %s' % grindfile
+    
 
 def getShakeURLs(shakeurl):
     urlt = 'http://earthquake.usgs.gov/fdsnws/event/1/query?eventid=[EVENTID]&format=geojson'
@@ -512,7 +514,13 @@ def main(args):
         faulturl = urlparse.urljoin(shakeurl,'download/%s' % faultfile)
     else:
         infourl,faulturl,gridurl,stationurl = getShakeURLs(shakeurl)
-        grind,args,sources,faultfile = readInfo(infourl)
+        if infourl is not None:
+            grind,args,sources,faultfile = readInfo(infourl)
+        else:
+            grind = {}
+            args = {}
+            sources = {}
+            faultfile = ''
     
     eventdict = getEventInfo(gridurl)
     writeEvent(grind,args,sources,faultfile,faulturl,stationurl,eventdict,shakehome)
