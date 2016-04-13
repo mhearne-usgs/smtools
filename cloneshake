@@ -86,14 +86,14 @@ source_network : us'''
 
 SOURCE_TEMPLATE = '''mech=[MECH]\n'''
 
-RUN_TEMPLATE = '''/Users/mhearne/ShakeMap/bin/../bin/zoneconfig2 -event [EVENT]
-/Users/mhearne/ShakeMap/bin/../bin/retrieve -event [EVENT]
-/Users/mhearne/ShakeMap/bin/../bin/grind -event [EVENT] [QTM] -xml -lonspan 6.0 -psa [DIRECTIVITY]
-/Users/mhearne/ShakeMap/bin/../bin/tag -event [EVENT]
-/Users/mhearne/ShakeMap/bin/../bin/mapping -event [EVENT] -timestamp -itopo
-/Users/mhearne/ShakeMap/bin/../bin/genex -event [EVENT] -zip -metadata -shape shape -shape hazus
-/Users/mhearne/ShakeMap/bin/../bin/transfer -event [EVENT] -www -push
-/Users/mhearne/ShakeMap/bin/../bin/setversion -event [EVENT] -savedata'''
+RUN_TEMPLATE = '''[HOME]/ShakeMap/bin/../bin/zoneconfig2 -event [EVENT]
+[HOME]/ShakeMap/bin/../bin/retrieve -event [EVENT]
+[HOME]/ShakeMap/bin/../bin/grind -event [EVENT] [QTM] -xml -lonspan 6.0 -psa [DIRECTIVITY]
+[HOME]/ShakeMap/bin/../bin/tag -event [EVENT]
+[HOME]/ShakeMap/bin/../bin/mapping -event [EVENT] -timestamp -itopo
+[HOME]/ShakeMap/bin/../bin/genex -event [EVENT] -zip -metadata -shape shape -shape hazus
+[HOME]/ShakeMap/bin/../bin/transfer -event [EVENT] -www -push
+[HOME]/ShakeMap/bin/../bin/setversion -event [EVENT] -savedata'''
 
 def parseJSONInfo(jsondata):
     jdict = json.loads(jsondata)
@@ -442,6 +442,7 @@ def writeEvent(grind,args,sources,faultfile,faulturl,stationurl,eventdict,shakeh
     runfile = os.path.join(datadir,'RUNFILE.sh')
     f = open(runfile,'wt')
     runtext = RUN_TEMPLATE.replace('[EVENT]',eventdict['id'])
+    runtext = runtext.replace('[HOME]',os.path.expanduser('~'))
     if args.has_key('qtm') and args['qtm']:
         runtext = runtext.replace('[QTM]','-qtm')
     else:
