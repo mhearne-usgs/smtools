@@ -91,6 +91,7 @@ RUN_TEMPLATE = '''[HOME]/ShakeMap/bin/../bin/zoneconfig2 -event [EVENT]
 [HOME]/ShakeMap/bin/../bin/grind -event [EVENT] [QTM] -xml -lonspan 6.0 -psa [DIRECTIVITY]
 [HOME]/ShakeMap/bin/../bin/tag -event [EVENT]
 [HOME]/ShakeMap/bin/../bin/mapping -event [EVENT] -timestamp -itopo
+[HOME]/ShakeMap/bin/../bin/plotregr -event [EVENT] -lab_dev 6 -psa
 [HOME]/ShakeMap/bin/../bin/genex -event [EVENT] -zip -metadata -shape shape -shape hazus
 [HOME]/ShakeMap/bin/../bin/transfer -event [EVENT] -www -push
 [HOME]/ShakeMap/bin/../bin/setversion -event [EVENT] -savedata'''
