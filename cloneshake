@@ -237,9 +237,9 @@ def parseOldInfo(root):
                 'bias_max_bias':2, 
                 'bias_min_bias':-2, 
                 'gmdecay':0.5, 
-                'gmroi':10, 
+                'gmroi':'10k', 
                 'idecay':0.5, 
-                'iroi':10}
+                'iroi':'10k'}
     grind.update(defaults)
     return (grind,args,sources,faultfile)
 
