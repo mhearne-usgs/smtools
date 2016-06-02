@@ -97,6 +97,7 @@ RUN_TEMPLATE = '''[HOME]/ShakeMap/bin/../bin/zoneconfig2 -event [EVENT]
 [HOME]/ShakeMap/bin/../bin/setversion -event [EVENT] -savedata'''
 
 def parseJSONInfo(jsondata):
+    truth = {'yes':'true','no':'false'}
     jdict = json.loads(jsondata)
     faultfile = jdict['input']['event_information']['faultfiles']
     sources = {'mech':jdict['input']['event_information']['src_mech']}
@@ -120,12 +121,12 @@ def parseJSONInfo(jsondata):
     grind['bias_min_bias'] = jdict['processing']['miscellaneous']['bias_min_bias']
     grind['bias_max_mag'] = jdict['processing']['miscellaneous']['bias_max_mag']
     grind['bias_norm'] = jdict['processing']['miscellaneous']['bias_norm']
-    grind['bias_log_amp'] = jdict['processing']['miscellaneous']['bias_log_amp']
+    grind['bias_log_amp'] = truth[jdict['processing']['miscellaneous']['bias_log_amp']]
     grind['outlier_deviation_level'] = jdict['processing']['miscellaneous']['outlier_deviation_level']
     grind['bias_min_stations'] = jdict['processing']['miscellaneous']['bias_min_stations']
-    grind['gmroi'] = jdict['processing']['roi']['gm']['roi']
+    grind['gmroi'] = '%ik' % jdict['processing']['roi']['gm']['roi']
     grind['gmdecay'] = jdict['processing']['roi']['gm']['decay']
-    grind['iroi'] = jdict['processing']['roi']['intensity']['roi']
+    grind['iroi'] = '%ik' % jdict['processing']['roi']['intensity']['roi']
     grind['idecay'] = jdict['processing']['roi']['intensity']['decay']
     grind['latspan'] = float(jdict['output']['map_information']['grid_span']['latitude'])
     grind['lonspan'] = float(jdict['output']['map_information']['grid_span']['longitude'])
@@ -225,7 +226,21 @@ def parseOldInfo(root):
             grind['bias_norm'] = tag.getAttribute('value')
         if tag.getAttribute('name') == 'bias_min_stations':
             grind['bias_min_stations'] = tag.getAttribute('value')
-        
+
+    #Defaults for things that aren't included in older info.xml files.
+    defaults = {'outlier_deviation_level':3, 
+                'outlier_max_mag':7, 
+                'bias_norm':'l1', 
+                'bias_max_range':120, 
+                'bias_min_stations':6, 
+                'bias_max_mag':7, 
+                'bias_max_bias':2, 
+                'bias_min_bias':-2, 
+                'gmdecay':0.5, 
+                'gmroi':10, 
+                'idecay':0.5, 
+                'iroi':10}
+    grind.update(defaults)
     return (grind,args,sources,faultfile)
 
 def parseInfo20(root):
@@ -337,6 +352,7 @@ def getEventInfo(gridurl):
     infodict = {}
     infodict['id'] = root.getAttribute('event_id')
     event = root.getElementsByTagName('event')[0]
+    gridspec = root.getElementsByTagName('grid_specification')[0]
     infodict['lat'] = float(event.getAttribute('lat'))
     infodict['lon'] = float(event.getAttribute('lon'))
     infodict['depth'] = float(event.getAttribute('depth'))
@@ -351,6 +367,12 @@ def getEventInfo(gridurl):
     infodict['hour'] = time.hour
     infodict['minute'] = time.minute
     infodict['second'] = time.second
+    infodict['lon_min'] = float(gridspec.getAttribute('lon_min'))
+    infodict['lon_max'] = float(gridspec.getAttribute('lon_max'))
+    infodict['lat_min'] = float(gridspec.getAttribute('lat_min'))
+    infodict['lat_max'] = float(gridspec.getAttribute('lat_max'))
+    infodict['lon_spacing'] = float(gridspec.getAttribute('nominal_lon_spacing'))
+    infodict['lat_spacing'] = float(gridspec.getAttribute('nominal_lat_spacing'))
     ctimestr = root.getAttribute('process_timestamp')
     ctimestr = ctimestr[0:19]
     ctime = datetime.datetime(*strptime(ctimestr,"%Y-%m-%dT%H:%M:%S")[0:6])
@@ -371,11 +393,12 @@ def writeEvent(grind,args,sources,faultfile,faulturl,stationurl,eventdict,shakeh
     #write grind.conf file
     if len(grind):
         #get the location of the qtm file on this system
-        grindfile = os.path.join(shakehome,'config','grind.conf')
-        lines = open(grindfile,'rt').readlines()
+        system_grindfile = os.path.join(shakehome,'config','grind.conf')
+        grindfile = os.path.join(confdir,'grind.conf')
+        lines = open(system_grindfile,'rt').readlines()
         for line in lines:
             if line.find('qtm_file') > -1 and not line.strip().startswith('#'):
-                grind['qtm_file'] = line.split(':')[1]
+                grind['qtm_file'] = line.split(':')[1].strip()
                 break
     
         gstr = GRIND_TEMPLATE
@@ -387,7 +410,7 @@ def writeEvent(grind,args,sources,faultfile,faulturl,stationurl,eventdict,shakeh
         if len(unfilled):
             print 'Did not fill in all macros with values, missing "%s".' % str(unfilled)
             sys.exit(1)
-        f = open(grindfile,'wt')    
+        f = open(grindfile,'wt')
         f.write(gstr)
         f.close()
         print 'Writing grind config to %s' % grindfile
@@ -523,8 +546,14 @@ def main(args):
             args = {}
             sources = {}
             faultfile = ''
+
     
     eventdict = getEventInfo(gridurl)
+    if 'latspan' not in grind:
+        grind['latspan'] = eventdict['lat_max'] - eventdict['lat_min']
+        grind['lonspan'] = eventdict['lon_max'] - eventdict['lon_min']
+        grind['x_grid_interval'] = eventdict['lon_spacing']
+        grind['y_grid_interval'] = eventdict['lat_spacing']
     writeEvent(grind,args,sources,faultfile,faulturl,stationurl,eventdict,shakehome)
     print 'Cloning completed.\nTo run this event, do:\nsh %s/data/%s/RUNFILE.sh' % (shakehome,eventdict['id'])
     
