@@ -149,6 +149,8 @@ def parseOldInfo(root):
     sources = {'mech':'ALL'}
     faultfile = None
     for tag in tags:
+        tname = tag.getAttribute('name')
+        #print(tname)
         if tag.getAttribute('name') == 'faultfiles':
             faultfile = tag.getAttribute('value')
         if tag.getAttribute('name') == 'src_mech':
@@ -158,19 +160,19 @@ def parseOldInfo(root):
         if tag.getAttribute('name') == 'pgm2mi':
             value = tag.getAttribute('value')
             vparts = value.split()
-            grind['pgm2mi'] = vparts[0].split('::')[2]
+            grind['pgm2mi'] = vparts[0].split('::')[-1]
         if tag.getAttribute('name') == 'mi2pgm':
             value = tag.getAttribute('value')
             vparts = value.split()
-            grind['mi2pgm'] = vparts[0].split('::')[2]
+            grind['mi2pgm'] = vparts[0].split('::')[-1]
         if tag.getAttribute('name') == 'GMPE':
             value = tag.getAttribute('value')
             vparts = value.split()
-            grind['gmpe'] = vparts[0].split('::')[2]
+            grind['gmpe'] = vparts[0].split('::')[-1]
         if tag.getAttribute('name') == 'IPE':
             value = tag.getAttribute('value')
             vparts = value.split()
-            grind['ipe'] = vparts[0].split('::')[2]
+            grind['ipe'] = vparts[0].split('::')[-1]
         if tag.getAttribute('name') == 'Vs30default':
             grind['vs30'] = tag.getAttribute('value')
         if tag.getAttribute('name') == 'latspan':
