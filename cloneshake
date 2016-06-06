@@ -380,7 +380,7 @@ def getEventInfo(gridurl):
     root.unlink()
     return infodict
 
-def writeEvent(grind,args,sources,faultfile,faulturl,stationurl,eventdict,shakehome):
+def writeEvent(grind,args,sources,faultfile,faulturl,stationurl,eventdict,shakehome,gridurl):
     #write the event.xml file
     datadir = os.path.join(shakehome,'data',eventdict['id'])
     inputdir = os.path.join(datadir,'input')
@@ -390,6 +390,19 @@ def writeEvent(grind,args,sources,faultfile,faulturl,stationurl,eventdict,shakeh
     if not os.path.isdir(confdir):
         os.makedirs(confdir)
 
+    #write the grid.xml file to an output_old directory
+    oldoutputdir = os.path.join(datadir,'output_old')
+    if not os.path.isdir(oldoutputdir):
+        os.makedirs(oldoutputdir)
+    fname = os.path.join(oldoutputdir,'grid.xml')
+    gridfh = urllib2.urlopen(gridurl)
+    gdata = gridfh.read()
+    gridfh.close()
+    print('Writing grid output file to %s' % fname)
+    f = open(fname,'wt')
+    f.write(gdata)
+    f.close()
+        
     #write grind.conf file
     if len(grind):
         #get the location of the qtm file on this system
@@ -554,7 +567,7 @@ def main(args):
         grind['lonspan'] = eventdict['lon_max'] - eventdict['lon_min']
         grind['x_grid_interval'] = eventdict['lon_spacing']
         grind['y_grid_interval'] = eventdict['lat_spacing']
-    writeEvent(grind,args,sources,faultfile,faulturl,stationurl,eventdict,shakehome)
+    writeEvent(grind,args,sources,faultfile,faulturl,stationurl,eventdict,shakehome,gridurl)
     print 'Cloning completed.\nTo run this event, do:\nsh %s/data/%s/RUNFILE.sh' % (shakehome,eventdict['id'])
     
 
