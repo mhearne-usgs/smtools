@@ -99,8 +99,22 @@ RUN_TEMPLATE = '''[SHAKEHOME]/bin/zoneconfig2 -event [EVENT]
 [SHAKEHOME]/bin/mapping -event [EVENT] -timestamp -itopo
 [SHAKEHOME]/bin/plotregr -event [EVENT] -lab_dev 6 -psa
 [SHAKEHOME]/bin/genex -event [EVENT] -zip -metadata -shape shape -shape hazus
+[SHAKEHOME]/bin/transfer -event [EVENT] -www -push
+[SHAKEHOME]/bin/setversion -event [EVENT] -savedata'''
+
+RUN_TEMPLATE_EST = '''#[SHAKEHOME]/bin/zoneconfig2 -event [EVENT]
+#[SHAKEHOME]/bin/retrieve -event [EVENT]
+[SHAKEHOME]/bin/grind -event [EVENT] [QTM] -xml -lonspan 6.0 -psa [DIRECTIVITY]
+[SHAKEHOME]/bin/tag -event [EVENT]
+[SHAKEHOME]/bin/mapping -event [EVENT] -timestamp -itopo
+[SHAKEHOME]/bin/plotregr -event [EVENT] -lab_dev 6 -psa
+[SHAKEHOME]/bin/genex -event [EVENT] -zip -metadata -shape shape -shape hazus
 #[SHAKEHOME]/bin/transfer -event [EVENT] -www -push
-#[SHAKEHOME]/bin/setversion -event [EVENT] -savedata'''
+#[SHAKEHOME]/bin/setversion -event [EVENT] -savedata
+[SHAKEHOME]/bin/edit_info -event [EVENT] -tag gmpe -value "[GMPE]"
+[SHAKEHOME]/bin/edit_info -event [EVENT] -tag ipe -value "[IPE]"
+[SHAKEHOME]/bin/edit_info -event [EVENT] -tag site_correction -value "[SITE]"'''
+
 
 def parseJSONInfo(jsondata):
     truth = {'yes':'true','no':'false'}
@@ -210,6 +224,7 @@ def parseOldInfo(root):
         #site correction
         if tag.getAttribute('name') == 'site_correction':
             tvalue = tag.getAttribute('value')
+            grind['site_correction'] = tvalue
             if tvalue in ['disabled','none']:
                 args['qtm'] = False
                 grind['use_gmpe_sc'] = 'false'
@@ -515,10 +530,12 @@ def writeEvent(grind,args,sources,faultfile,faulturl,stationurl,eventdict,shakeh
     for key,value in sources.iteritems():
         f.write('%s = %s\n' % (key,value))
     f.close()
-
+    
     #write run script
     runfile = os.path.join(datadir,'RUNFILE.sh')
     f = open(runfile,'wt')
+    if pargs.estimates is True:
+        RUN_TEMPLATE = RUN_TEMPLATE_EST
     runtext = RUN_TEMPLATE.replace('[EVENT]',eventdict['id'])
     runtext = runtext.replace('[SHAKEHOME]',shakehome)
     if args.has_key('qtm') and args['qtm'] and (pargs.estimates is False):
@@ -529,6 +546,10 @@ def writeEvent(grind,args,sources,faultfile,faulturl,stationurl,eventdict,shakeh
         runtext = runtext.replace('[DIRECTIVITY]','-directivity')
     else:
         runtext = runtext.replace('[DIRECTIVITY]','')
+    if pargs.estimates is True:
+        runtext = runtext.replace('[GMPE]', grind['gmpe'])
+        runtext = runtext.replace('[IPE]', grind['ipe'])
+        runtext = runtext.replace('[SITE]', grind['site_correction'])
     f.write(runtext)
     f.close()
     
