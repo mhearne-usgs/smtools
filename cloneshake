@@ -169,6 +169,7 @@ def parseOldInfo(root):
             'directivity':False} #grind command line arguments
     sources = {'mech':'ALL'}
     faultfile = None
+    ipe_done = False
     for tag in tags:
         tname = tag.getAttribute('name')
         #print(tname)
@@ -182,7 +183,7 @@ def parseOldInfo(root):
             value = tag.getAttribute('value')
             vparts = value.split()
             grind['pgm2mi'] = vparts[0].split('::')[-1]
-        if tag.getAttribute('name') == 'mi2pgm':
+        if tag.getAttribute('name').strip() == 'mi2pgm':
             value = tag.getAttribute('value')
             vparts = value.split()
             grind['mi2pgm'] = vparts[0].split('::')[-1]
@@ -191,6 +192,7 @@ def parseOldInfo(root):
             vparts = value.split()
             grind['gmpe'] = vparts[0].split('::')[-1]
         if tag.getAttribute('name') == 'IPE':
+            ipe_done = True
             value = tag.getAttribute('value')
             vparts = value.split()
             grind['ipe'] = vparts[0].split('::')[-1]
@@ -252,7 +254,9 @@ def parseOldInfo(root):
             grind['bias_norm'] = tag.getAttribute('value')
         if tag.getAttribute('name') == 'bias_min_stations':
             grind['bias_min_stations'] = tag.getAttribute('value')
-
+            
+    if (ipe_done is False) and (pargs.missing is True):
+        grind['ipe'] = 'DefaultIPE'
     #Defaults for things that aren't included in older info.xml files.
     defaults = {'outlier_deviation_level':3, 
                 'outlier_max_mag':7, 
@@ -295,6 +299,7 @@ def parseInfo20(root):
                 if subsection.getAttribute('name') == 'site_response':
                     vs30 = subsection.getElementsByTagName('vs30default')[0].getAttribute('value')
                     scvalue = subsection.getElementsByTagName('site_correction')[0].getAttribute('value')
+                    grind['site_correction'] = scvalue
                     if scvalue in ['disabled','none']:
                         args['qtm'] = False
                         grind['use_gmpe_sc'] = 'true'
@@ -327,20 +332,18 @@ def parseInfo20(root):
                     grind['lonspan'] = subsection.getElementsByTagName('lonspan')[0].getAttribute('value')
                     grind['x_grid_interval'] = subsection.getElementsByTagName('x_grid_interval')[0].getAttribute('value')
                     grind['y_grid_interval'] = subsection.getElementsByTagName('y_grid_interval')[0].getAttribute('value')
-                    #set the strictbound attribute with lat_min,lat_max, etc. values if the hypocenter is not approximately centered
-                    if lat is not None:
-                        ymin = float(subsection.getElementsByTagName('lat_min')[0].getAttribute('value'))
-                        ymax = float(subsection.getElementsByTagName('lat_max')[0].getAttribute('value'))
-                        xmin = float(subsection.getElementsByTagName('lon_min')[0].getAttribute('value'))
-                        xmax = float(subsection.getElementsByTagName('lon_max')[0].getAttribute('value'))
-                        x1p = lon/100.0
-                        y1p = lat/100.0
-                        ycenter = ymin + (ymax-ymin)/2.0
-                        xcenter = xmin + (xmax-xmin)/2.0
-                        if xcenter > lon-x1p and xcenter < lon+x1p and ycenter > lat-y1p and ycenter < lat+y1p:
-                            pass
-                        else:
-                            grind['strictbound'] = '%.4f %.4f %.4f %.4f' % (xmin,ymin,xmax,ymax)
+                    ymin = float(subsection.getElementsByTagName('lat_min')[0].getAttribute('value'))
+                    ymax = float(subsection.getElementsByTagName('lat_max')[0].getAttribute('value'))
+                    xmin = float(subsection.getElementsByTagName('lon_min')[0].getAttribute('value'))
+                    xmax = float(subsection.getElementsByTagName('lon_max')[0].getAttribute('value'))
+                    x1p = lon/100.0
+                    y1p = lat/100.0
+                    ycenter = ymin + (ymax-ymin)/2.0
+                    xcenter = xmin + (xmax-xmin)/2.0
+                    if xcenter > lon-x1p and xcenter < lon+x1p and ycenter > lat-y1p and ycenter < lat+y1p:
+                        pass
+                    else:
+                        grind['strictbound'] = '%.4f %.4f %.4f %.4f' % (xmin,ymin,xmax,ymax)
                     
     return (grind,args,sources,faultfile)
                  
@@ -476,8 +479,11 @@ def writeEvent(grind,args,sources,faultfile,faulturl,stationurl,eventdict,shakeh
                 gstr = gstr.replace('['+key.upper()+']',str(value))
             
         # Need to handle bounds separately...
-        mbsp = grind['map_bound'].split('/')
-        bstr = 'strictbound : ' + mbsp[0] + ' ' +  mbsp[2] + ' ' +  mbsp[1] + ' ' + mbsp[3]
+        if 'map_bound' in grind.keys():
+            mbsp = grind['map_bound'].split('/')
+            bstr = 'strictbound : ' + mbsp[0] + ' ' +  mbsp[2] + ' ' +  mbsp[1] + ' ' + mbsp[3]
+        else:
+            bstr = 'strictbound : ' + grind['strictbound'] 
         gstr = gstr.replace('[BOUNDS]', bstr)
         
         #make sure we replaced all the macros
@@ -485,7 +491,8 @@ def writeEvent(grind,args,sources,faultfile,faulturl,stationurl,eventdict,shakeh
         unfilled = re.findall(pat,gstr)
         if len(unfilled):
             print('Did not fill in all macros with values, missing "%s".' % str(unfilled))
-            sys.exit(1)
+            if pargs.missing is False: 
+                sys.exit(1)
         f = open(grindfile,'wt')
         f.write(gstr)
         f.close()
@@ -556,7 +563,8 @@ def writeEvent(grind,args,sources,faultfile,faulturl,stationurl,eventdict,shakeh
         runtext = runtext.replace('[DIRECTIVITY]','')
     if pargs.estimates is True:
         runtext = runtext.replace('[GMPE]', grind['gmpe'])
-        runtext = runtext.replace('[IPE]', grind['ipe'])
+        if ('ipe' in grind.keys()) or (pargs.missing is False):
+            runtext = runtext.replace('[IPE]', grind['ipe'])
         runtext = runtext.replace('[SITE]', grind['site_correction'])
     f.write(runtext)
     f.close()
@@ -662,6 +670,8 @@ Examples:
                         help='create *_estimates.grd files from grid.xml')
     parser.add_argument('-n','--network', action = 'store', default = "us",
                         help='Overwrite network code in event file.')
+    parser.add_argument('-m','--missing', action = 'store_true',
+                        help='allow missing tags from info.xml; default is False; use of this option is for cloning very old shakemaps (usually with -e) for which the info.xml is not complete.')
     pargs = parser.parse_args()
     if not pargs.url:
         print(parser.print_help())
