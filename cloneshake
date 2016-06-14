@@ -12,6 +12,10 @@ import json
 import datetime
 from time import strptime
 import re
+from mapio.gmt import GMTGrid
+from mapio.geodict import GeoDict
+from mapio.shake import ShakeGrid
+import numpy as np
 
 YESNO = {'yes':'true','no':'false'}
 ARGBOOL = {'yes':True,'no':False}
@@ -42,7 +46,7 @@ EVENT_TEMPLATE = '''<?xml version="1.0" encoding="US-ASCII" standalone="yes"?>
   created       CDATA   #REQUIRED
 >
 ]>
-<earthquake id="[ID]" lat="[LAT]" lon="[LON]" mag="[MAG]" year="[YEAR]" month="[MONTH]" day="[DAY]" hour="[HOUR]" minute="[MINUTE]" second="[SECOND]" timezone="GMT" depth="[DEPTH]" locstring="[LOCSTRING]" created="[CREATED]" network="us" />'''
+<earthquake id="[ID]" lat="[LAT]" lon="[LON]" mag="[MAG]" year="[YEAR]" month="[MONTH]" day="[DAY]" hour="[HOUR]" minute="[MINUTE]" second="[SECOND]" timezone="GMT" depth="[DEPTH]" locstring="[LOCSTRING]" created="[CREATED]" network="[NET]" />'''
 
 GRIND_TEMPLATE = '''smVs30default : [VS30]
 bad_station : 8016 9.9 19990101-
@@ -82,19 +86,36 @@ direct_patch_size : 1000
 mi2pgm : [MI2PGM]
 pgm2mi : [PGM2MI]
 
+[BOUNDS]
+
 source_network : us'''
 
 SOURCE_TEMPLATE = '''mech=[MECH]\n'''
 
-RUN_TEMPLATE = '''[HOME]/ShakeMap/bin/../bin/zoneconfig2 -event [EVENT]
-[HOME]/ShakeMap/bin/../bin/retrieve -event [EVENT]
-[HOME]/ShakeMap/bin/../bin/grind -event [EVENT] [QTM] -xml -lonspan 6.0 -psa [DIRECTIVITY]
-[HOME]/ShakeMap/bin/../bin/tag -event [EVENT]
-[HOME]/ShakeMap/bin/../bin/mapping -event [EVENT] -timestamp -itopo
-[HOME]/ShakeMap/bin/../bin/plotregr -event [EVENT] -lab_dev 6 -psa
-[HOME]/ShakeMap/bin/../bin/genex -event [EVENT] -zip -metadata -shape shape -shape hazus
-[HOME]/ShakeMap/bin/../bin/transfer -event [EVENT] -www -push
-[HOME]/ShakeMap/bin/../bin/setversion -event [EVENT] -savedata'''
+RUN_TEMPLATE = '''[SHAKEHOME]/bin/zoneconfig2 -event [EVENT]
+[SHAKEHOME]/bin/retrieve -event [EVENT]
+[SHAKEHOME]/bin/grind -event [EVENT] [QTM] -xml -lonspan 6.0 -psa [DIRECTIVITY]
+[SHAKEHOME]/bin/tag -event [EVENT]
+[SHAKEHOME]/bin/mapping -event [EVENT] -timestamp -itopo
+[SHAKEHOME]/bin/plotregr -event [EVENT] -lab_dev 6 -psa
+[SHAKEHOME]/bin/genex -event [EVENT] -zip -metadata -shape shape -shape hazus
+[SHAKEHOME]/bin/transfer -event [EVENT] -www -push
+[SHAKEHOME]/bin/setversion -event [EVENT] -savedata'''
+
+RUN_TEMPLATE_EST = '''#[SHAKEHOME]/bin/zoneconfig2 -event [EVENT]
+#[SHAKEHOME]/bin/retrieve -event [EVENT]
+[SHAKEHOME]/bin/grind -event [EVENT] [QTM] -xml -lonspan 6.0 -psa [DIRECTIVITY]
+[SHAKEHOME]/bin/edit_info -event [EVENT] -tag gmpe -value "[GMPE]"
+[SHAKEHOME]/bin/edit_info -event [EVENT] -tag ipe -value "[IPE]"
+[SHAKEHOME]/bin/edit_info -event [EVENT] -tag site_correction -value "[SITE]"
+[SHAKEHOME]/bin/edit_info -event [EVENT] -tag mean_uncertainty -value -1
+[SHAKEHOME]/bin/tag -event [EVENT]
+[SHAKEHOME]/bin/mapping -event [EVENT] -timestamp -itopo
+[SHAKEHOME]/bin/plotregr -event [EVENT] -lab_dev 6 -psa
+[SHAKEHOME]/bin/genex -event [EVENT] -zip -metadata -shape shape -shape hazus
+#[SHAKEHOME]/bin/transfer -event [EVENT] -www -push
+#[SHAKEHOME]/bin/setversion -event [EVENT] -savedata'''
+
 
 def parseJSONInfo(jsondata):
     truth = {'yes':'true','no':'false'}
@@ -148,6 +169,7 @@ def parseOldInfo(root):
             'directivity':False} #grind command line arguments
     sources = {'mech':'ALL'}
     faultfile = None
+    ipe_done = False
     for tag in tags:
         tname = tag.getAttribute('name')
         #print(tname)
@@ -161,7 +183,7 @@ def parseOldInfo(root):
             value = tag.getAttribute('value')
             vparts = value.split()
             grind['pgm2mi'] = vparts[0].split('::')[-1]
-        if tag.getAttribute('name') == 'mi2pgm':
+        if tag.getAttribute('name').strip() == 'mi2pgm':
             value = tag.getAttribute('value')
             vparts = value.split()
             grind['mi2pgm'] = vparts[0].split('::')[-1]
@@ -170,6 +192,7 @@ def parseOldInfo(root):
             vparts = value.split()
             grind['gmpe'] = vparts[0].split('::')[-1]
         if tag.getAttribute('name') == 'IPE':
+            ipe_done = True
             value = tag.getAttribute('value')
             vparts = value.split()
             grind['ipe'] = vparts[0].split('::')[-1]
@@ -197,11 +220,14 @@ def parseOldInfo(root):
             grind['idecay'] = tag.getAttribute('value')
         if tag.getAttribute('name') == 'iroi':
             grind['iroi'] = tag.getAttribute('value')
+        if tag.getAttribute('name') == 'map_bound':
+            grind['map_bound'] = tag.getAttribute('value')
         
         #basin correction not in this format?
         #site correction
         if tag.getAttribute('name') == 'site_correction':
             tvalue = tag.getAttribute('value')
+            grind['site_correction'] = tvalue
             if tvalue in ['disabled','none']:
                 args['qtm'] = False
                 grind['use_gmpe_sc'] = 'false'
@@ -228,7 +254,9 @@ def parseOldInfo(root):
             grind['bias_norm'] = tag.getAttribute('value')
         if tag.getAttribute('name') == 'bias_min_stations':
             grind['bias_min_stations'] = tag.getAttribute('value')
-
+            
+    if (ipe_done is False) and (pargs.missing is True):
+        grind['ipe'] = 'DefaultIPE'
     #Defaults for things that aren't included in older info.xml files.
     defaults = {'outlier_deviation_level':3, 
                 'outlier_max_mag':7, 
@@ -271,6 +299,7 @@ def parseInfo20(root):
                 if subsection.getAttribute('name') == 'site_response':
                     vs30 = subsection.getElementsByTagName('vs30default')[0].getAttribute('value')
                     scvalue = subsection.getElementsByTagName('site_correction')[0].getAttribute('value')
+                    grind['site_correction'] = scvalue
                     if scvalue in ['disabled','none']:
                         args['qtm'] = False
                         grind['use_gmpe_sc'] = 'true'
@@ -303,20 +332,18 @@ def parseInfo20(root):
                     grind['lonspan'] = subsection.getElementsByTagName('lonspan')[0].getAttribute('value')
                     grind['x_grid_interval'] = subsection.getElementsByTagName('x_grid_interval')[0].getAttribute('value')
                     grind['y_grid_interval'] = subsection.getElementsByTagName('y_grid_interval')[0].getAttribute('value')
-                    #set the strictbound attribute with lat_min,lat_max, etc. values if the hypocenter is not approximately centered
-                    if lat is not None:
-                        ymin = float(subsection.getElementsByTagName('lat_min')[0].getAttribute('value'))
-                        ymax = float(subsection.getElementsByTagName('lat_max')[0].getAttribute('value'))
-                        xmin = float(subsection.getElementsByTagName('lon_min')[0].getAttribute('value'))
-                        xmax = float(subsection.getElementsByTagName('lon_max')[0].getAttribute('value'))
-                        x1p = lon/100.0
-                        y1p = lat/100.0
-                        ycenter = ymin + (ymax-ymin)/2.0
-                        xcenter = xmin + (xmax-xmin)/2.0
-                        if xcenter > lon-x1p and xcenter < lon+x1p and ycenter > lat-y1p and ycenter < lat+y1p:
-                            pass
-                        else:
-                            grind['strictbound'] = '%.4f %.4f %.4f %.4f' % (xmin,ymin,xmax,ymax)
+                    ymin = float(subsection.getElementsByTagName('lat_min')[0].getAttribute('value'))
+                    ymax = float(subsection.getElementsByTagName('lat_max')[0].getAttribute('value'))
+                    xmin = float(subsection.getElementsByTagName('lon_min')[0].getAttribute('value'))
+                    xmax = float(subsection.getElementsByTagName('lon_max')[0].getAttribute('value'))
+                    x1p = lon/100.0
+                    y1p = lat/100.0
+                    ycenter = ymin + (ymax-ymin)/2.0
+                    xcenter = xmin + (xmax-xmin)/2.0
+                    if xcenter > lon-x1p and xcenter < lon+x1p and ycenter > lat-y1p and ycenter < lat+y1p:
+                        pass
+                    else:
+                        grind['strictbound'] = '%.4f %.4f %.4f %.4f' % (xmin,ymin,xmax,ymax)
                     
     return (grind,args,sources,faultfile)
                  
@@ -352,7 +379,14 @@ def getEventInfo(gridurl):
     xdom = parseString(gdata)
     root = xdom.getElementsByTagName('shakemap_grid')[0]
     infodict = {}
-    infodict['id'] = root.getAttribute('event_id')
+    id = root.getAttribute('event_id').lower().replace('.', 'p')
+    id = "".join(x for x in id if x.isalnum())
+    if id[-3:] != '_se':
+        if id[-2:] == 'se':
+            id = id[:-2] + '_se'
+        else:
+            id = id + '_se'
+    infodict['id'] = id
     event = root.getElementsByTagName('event')[0]
     gridspec = root.getElementsByTagName('grid_specification')[0]
     infodict['lat'] = float(event.getAttribute('lat'))
@@ -382,7 +416,7 @@ def getEventInfo(gridurl):
     root.unlink()
     return infodict
 
-def writeEvent(grind,args,sources,faultfile,faulturl,stationurl,eventdict,shakehome,gridurl):
+def writeEvent(grind,args,sources,faultfile,faulturl,stationurl,eventdict,shakehome,gridurl,pargs):
     #write the event.xml file
     datadir = os.path.join(shakehome,'data',eventdict['id'])
     inputdir = os.path.join(datadir,'input')
@@ -392,18 +426,39 @@ def writeEvent(grind,args,sources,faultfile,faulturl,stationurl,eventdict,shakeh
     if not os.path.isdir(confdir):
         os.makedirs(confdir)
 
-    #write the grid.xml file to an output_old directory
-    oldoutputdir = os.path.join(datadir,'output_old')
-    if not os.path.isdir(oldoutputdir):
-        os.makedirs(oldoutputdir)
-    fname = os.path.join(oldoutputdir,'grid.xml')
-    gridfh = urllib2.urlopen(gridurl)
-    gdata = gridfh.read()
-    gridfh.close()
-    print('Writing grid output file to %s' % fname)
-    f = open(fname,'wt')
-    f.write(gdata)
-    f.close()
+    if pargs.estimates is True:
+        # Create *_estimates.grd from grid.xml
+        gridfh = urllib2.urlopen(gridurl)
+        sg = ShakeGrid.load(gridfh, adjust = "res")
+        gridfh.close()
+        dat = sg.getData()
+        gd = sg.getGeoDict()
+        pgagrd = GMTGrid(dat['pga'].getData(), gd)
+        pgagrd.save(os.path.join(inputdir, 'pga_estimates.grd'))
+        pgvgrd = GMTGrid(dat['pgv'].getData(), gd)
+        pgvgrd.save(os.path.join(inputdir, 'pgv_estimates.grd'))
+        mmigrd = GMTGrid(dat['mmi'].getData(), gd)
+        mmigrd.save(os.path.join(inputdir, 'mi_estimates.grd'))
+        psa03grd = GMTGrid(dat['psa03'].getData(), gd)
+        psa03grd.save(os.path.join(inputdir, 'psa03_estimates.grd'))
+        psa10grd = GMTGrid(dat['psa10'].getData(), gd)
+        psa10grd.save(os.path.join(inputdir, 'psa10_estimates.grd'))
+        psa30grd = GMTGrid(dat['psa30'].getData(), gd)
+        psa30grd.save(os.path.join(inputdir, 'psa30_estimates.grd'))
+        
+        # Note: should check for presence of uncertainty.xml.zip and use it
+        # to make *_sd.grd. Since I don't have any examples that have it
+        # currently, I'm just going to use -1 for sd.
+        sd = np.ones_like(dat['pga'].getData()) * -1.0
+        sdgrd = GMTGrid(sd, gd)
+        sdgrd.save(os.path.join(inputdir, 'pga_sd.grd'))
+        sdgrd.save(os.path.join(inputdir, 'pgv_sd.grd'))
+        sdgrd.save(os.path.join(inputdir, 'mi_sd.grd'))
+        sdgrd.save(os.path.join(inputdir, 'psa03_sd.grd'))
+        sdgrd.save(os.path.join(inputdir, 'psa10_sd.grd'))
+        sdgrd.save(os.path.join(inputdir, 'psa30_sd.grd'))
+        
+
         
     #write grind.conf file
     if len(grind):
@@ -418,19 +473,32 @@ def writeEvent(grind,args,sources,faultfile,faulturl,stationurl,eventdict,shakeh
     
         gstr = GRIND_TEMPLATE
         for key,value in grind.iteritems():
-            gstr = gstr.replace('['+key.upper()+']',str(value))
+            if (pargs.estimates is True) and (key is 'use_gmpe_sc'):
+                gstr = gstr.replace('['+key.upper()+']','false')
+            else:
+                gstr = gstr.replace('['+key.upper()+']',str(value))
+            
+        # Need to handle bounds separately...
+        if 'map_bound' in grind.keys():
+            mbsp = grind['map_bound'].split('/')
+            bstr = 'strictbound : ' + mbsp[0] + ' ' +  mbsp[2] + ' ' +  mbsp[1] + ' ' + mbsp[3]
+        else:
+            bstr = 'strictbound : ' + grind['strictbound'] 
+        gstr = gstr.replace('[BOUNDS]', bstr)
+        
         #make sure we replaced all the macros
         pat = '\[([^]]+)\]'
         unfilled = re.findall(pat,gstr)
         if len(unfilled):
-            print 'Did not fill in all macros with values, missing "%s".' % str(unfilled)
-            sys.exit(1)
+            print('Did not fill in all macros with values, missing "%s".' % str(unfilled))
+            if pargs.missing is False: 
+                sys.exit(1)
         f = open(grindfile,'wt')
         f.write(gstr)
         f.close()
-        print 'Writing grind config to %s' % grindfile
+        print('Writing grind config to %s' % grindfile)
     else:
-        print 'No grind information found.'
+        print('No grind information found.')
         
     #write event.xml file
     eventfile = os.path.join(inputdir,'event.xml')
@@ -438,9 +506,10 @@ def writeEvent(grind,args,sources,faultfile,faulturl,stationurl,eventdict,shakeh
     estr = EVENT_TEMPLATE
     for key,value in eventdict.iteritems():
         estr = estr.replace('['+key.upper()+']',str(value))
+    estr = estr.replace('[NET]', pargs.network)
     f.write(estr)
     f.close()
-    print 'Writing input file to %s' % eventfile
+    print('Writing input file to %s' % eventfile)
 
     #write stationlist.xml file (if it exists)
     try:
@@ -452,7 +521,7 @@ def writeEvent(grind,args,sources,faultfile,faulturl,stationurl,eventdict,shakeh
         f.write(data)
         f.close()
     except:
-        print 'No stationlist file found.'
+        print('No stationlist file found.')
     
     #write fault file
     try:
@@ -466,9 +535,9 @@ def writeEvent(grind,args,sources,faultfile,faulturl,stationurl,eventdict,shakeh
         f = open(faultfile,'wt')
         f.write(data)
         f.close()
-        print 'Writing fault file to %s' % faultfile
+        print('Writing fault file to %s' % faultfile)
     except:
-        print 'No fault file found.'
+        print('No fault file found.')
 
     #Write sources.txt file
     sourcefile = os.path.join(inputdir,'source.txt')
@@ -476,13 +545,15 @@ def writeEvent(grind,args,sources,faultfile,faulturl,stationurl,eventdict,shakeh
     for key,value in sources.iteritems():
         f.write('%s = %s\n' % (key,value))
     f.close()
-
+    
     #write run script
     runfile = os.path.join(datadir,'RUNFILE.sh')
     f = open(runfile,'wt')
+    if pargs.estimates is True:
+        RUN_TEMPLATE = RUN_TEMPLATE_EST
     runtext = RUN_TEMPLATE.replace('[EVENT]',eventdict['id'])
-    runtext = runtext.replace('[HOME]',os.path.expanduser('~'))
-    if args.has_key('qtm') and args['qtm']:
+    runtext = runtext.replace('[SHAKEHOME]',shakehome)
+    if args.has_key('qtm') and args['qtm'] and (pargs.estimates is False):
         runtext = runtext.replace('[QTM]','-qtm')
     else:
         runtext = runtext.replace('[QTM]','')
@@ -490,6 +561,11 @@ def writeEvent(grind,args,sources,faultfile,faulturl,stationurl,eventdict,shakeh
         runtext = runtext.replace('[DIRECTIVITY]','-directivity')
     else:
         runtext = runtext.replace('[DIRECTIVITY]','')
+    if pargs.estimates is True:
+        runtext = runtext.replace('[GMPE]', grind['gmpe'])
+        if ('ipe' in grind.keys()) or (pargs.missing is False):
+            runtext = runtext.replace('[IPE]', grind['ipe'])
+        runtext = runtext.replace('[SITE]', grind['site_correction'])
     f.write(runtext)
     f.close()
     
@@ -522,6 +598,7 @@ def getShakeURLs(shakeurl):
     return (infourl,faulturl,gridurl,stationurl)
     
 def main(args):
+    pargs = args # gets overwritten later...
     shakeurl = args.url
     #remove any stuff after a # sign in the url
     if shakeurl.find('#') == -1:
@@ -539,7 +616,7 @@ def main(args):
         shakehome = os.path.join(os.path.expanduser('~'),'ShakeMap')
     if not os.path.isdir(shakehome):
         msg = 'Could not find a ShakeMap installation at %s.  Specify the location of your ShakeMap installation with -s.'
-        print msg % (shakehome)
+        print(msg % (shakehome))
         sys.exit(1)
     #Is this a scenario?
     if shakeurl.find('_se') > -1:
@@ -549,7 +626,7 @@ def main(args):
         try:
             grind,args,sources,faultfile = readInfo(infourl)
         except Exception,error:
-            print 'There was a problem trying to clone the ShakeMap.\nError message:\n"%s".\nExiting.' % error.message
+            print('There was a problem trying to clone the ShakeMap.\nError message:\n"%s".\nExiting.' % error.message)
             sys.exit(1)
         faulturl = urlparse.urljoin(shakeurl,'download/%s' % faultfile)
     else:
@@ -569,8 +646,8 @@ def main(args):
         grind['lonspan'] = eventdict['lon_max'] - eventdict['lon_min']
         grind['x_grid_interval'] = eventdict['lon_spacing']
         grind['y_grid_interval'] = eventdict['lat_spacing']
-    writeEvent(grind,args,sources,faultfile,faulturl,stationurl,eventdict,shakehome,gridurl)
-    print 'Cloning completed.\nTo run this event, do:\nsh %s/data/%s/RUNFILE.sh' % (shakehome,eventdict['id'])
+    writeEvent(grind,args,sources,faultfile,faulturl,stationurl,eventdict,shakehome,gridurl,pargs)
+    print('Cloning completed.\nTo run this event, do:\nsh %s/data/%s/RUNFILE.sh' % (shakehome,eventdict['id']))
     
 
 if __name__ == '__main__':
@@ -588,9 +665,15 @@ Examples:
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('url', help='the URL of the desired ShakeMap.')
     shakehome = os.path.join(os.path.expanduser('~'),'ShakeMap')
-    parser.add_argument('-s','--shakehome', help='the location of ShakeMap install (default is %s.' % shakehome)
+    parser.add_argument('-s','--shakehome', help='the location of ShakeMap install; default is %s.' % shakehome)
+    parser.add_argument('-e','--estimates', action = 'store_true',
+                        help='create *_estimates.grd files from grid.xml')
+    parser.add_argument('-n','--network', action = 'store', default = "us",
+                        help='Overwrite network code in event file.')
+    parser.add_argument('-m','--missing', action = 'store_true',
+                        help='allow missing tags from info.xml; default is False; use of this option is for cloning very old shakemaps (usually with -e) for which the info.xml is not complete.')
     pargs = parser.parse_args()
     if not pargs.url:
-        print parser.print_help()
+        print(parser.print_help())
         sys.exit(1)
     main(pargs)
