@@ -8,15 +8,15 @@ warnings.simplefilter("ignore", DeprecationWarning)
 from datetime import datetime,timedelta
 import sys
 import os.path
-import urlparse
+import urllib.parse
 import ftplib
-import urllib2
+import urllib.request, urllib.error, urllib.parse
 from xml.dom import minidom
 
 #local
-from fetcher import StrongMotionFetcher,StrongMotionFetcherException
-from trace2xml import trace2xml
-import util
+from .fetcher import StrongMotionFetcher,StrongMotionFetcherException
+from .trace2xml import trace2xml
+from . import util
 
 #third party
 from obspy.core.trace import Trace
@@ -46,7 +46,7 @@ URL = 'http://itaca.mi.ingv.it/ItacaNet/CadmoDriver?_action_prepare_find_div=1&_
 def fetchItaly(starttime,endtime):
     url = URL.replace('STARTTIME',starttime.strftime('%Y-%m-%d'))
     url = url.replace('STOPTIME',endtime.strftime('%Y-%m-%d'))
-    fh = urllib2.urlopen(url)
+    fh = urllib.request.urlopen(url)
     data = fh.read()
     fh.close()
     startidx = data.find('<table class="CADMOMAINTABLE">')
@@ -60,7 +60,7 @@ def fetchItaly(starttime,endtime):
         eventid = anchor['id']
         #2009-04-05 20:20:53
         etime = datetime.strptime(anchor.string,'%Y-%m-%d %H:%M:%S')
-        print eventid,str(etime)
+        print(eventid,str(etime))
 
 def readitaly(datafile):
     f = open(datafile,'rt')
@@ -77,7 +77,7 @@ def readitaly(datafile):
         key,value = line.split(':')
         key = key.strip()
         value = value.strip()
-        if key not in HEADERS.keys():
+        if key not in list(HEADERS.keys()):
             continue
         hdrkey = HEADERS[key]
         if hdrkey == 'starttime':

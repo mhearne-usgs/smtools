@@ -2,11 +2,11 @@
 
 #stdlib imports
 import os.path
-import urllib2
-import urlparse
+import urllib.request, urllib.error, urllib.parse
+import urllib.parse
 from xml.dom.minidom import parseString
 import sys
-import StringIO
+import io
 import argparse
 import json
 from datetime import datetime,timedelta
@@ -46,10 +46,10 @@ BASEURL = 'http://earthquake.usgs.gov/fdsnws/event/1/query?eventid=[EVENT]&forma
 
 def getEventInfo(weburl):
     eventdict = {}
-    parts = urlparse.urlsplit(weburl.rstrip('/'))
+    parts = urllib.parse.urlsplit(weburl.rstrip('/'))
     eventid = parts.path.split('/')[-1]
     url = BASEURL.replace('[EVENT]',eventid)
-    fh = urllib2.urlopen(url)
+    fh = urllib.request.urlopen(url)
     data = fh.read()
     fh.close()
     jdict = json.loads(data)
@@ -105,7 +105,7 @@ def parseParams(params):
         eventdict['mag'] = float(params[4])
         eventdict['id'] = eventdict['time'].strftime('%Y%m%d%H%M%S')
         eventdict['locstring'] = '(%.4f,%.4f)' % (eventdict['lat'],eventdict['lon'])
-    except Exception,excobj:
+    except Exception as excobj:
         raise excobj
     return eventdict
     
@@ -124,7 +124,7 @@ def main(args):
         eventdict = parseParams(args.params)
         
     efolder = writeEvent(eventdict,shakehome)
-    print 'Completed creating ShakeMap %s.\nTo run this event, do:\n%s/bin/shake -event %s' % (efolder,shakehome,eventdict['id'])
+    print('Completed creating ShakeMap %s.\nTo run this event, do:\n%s/bin/shake -event %s' % (efolder,shakehome,eventdict['id']))
 
 if __name__ == '__main__':
     desc = '''Create a ShakeMap from NEIC web site or from scratch.
@@ -144,6 +144,6 @@ Examples:
     pargs = parser.parse_args()
     #must have at least one set
     if (pargs.url is None and pargs.params is None) or (pargs.url is not None and pargs.params is not None):
-        print parser.print_help()
+        print(parser.print_help())
         sys.exit(1)
     main(pargs)

@@ -7,8 +7,8 @@ import os.path
 import re
 
 #local
-from trace2xml import trace2xml
-import util
+from .trace2xml import trace2xml
+from . import util
 
 #third party
 from obspy.core.trace import Trace
@@ -93,7 +93,7 @@ if __name__ == '__main__':
     trace = traces[0]
     trace.plot()
     plt.savefig('chile.png')
-    print trace.data.max()
-    print trace.stats['calib']
-    print trace.data.max() * trace.stats['calib']
+    print(trace.data.max())
+    print(trace.stats['calib'])
+    print(trace.data.max() * trace.stats['calib'])
     #stationfile,plotfiles,tag = trace2xml(traces,None,os.getcwd(),doPlot=True)

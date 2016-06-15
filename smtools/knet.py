@@ -7,16 +7,16 @@ import sys
 import os.path
 import tarfile
 import ftplib
-import urlparse
+import urllib.parse
 import base64
 from collections import OrderedDict
-import urllib2
-import urllib
+import urllib.request, urllib.error, urllib.parse
+import urllib.request, urllib.parse, urllib.error
 
 #local
-from fetcher import StrongMotionFetcher,StrongMotionFetcherException
-from trace2xml import trace2xml
-import util
+from .fetcher import StrongMotionFetcher,StrongMotionFetcherException
+from .trace2xml import trace2xml
+from . import util
 
 #third party
 from obspy.core.trace import Trace
@@ -134,7 +134,7 @@ class KNETFetcher(StrongMotionFetcher):
         jpquarter = str(quarters[jptime.month])
         url = KIKNETURL.replace('YEAR',jpyear)
         url = url.replace('QUARTER',jpquarter)
-        fh = urllib2.urlopen(url)
+        fh = urllib.request.urlopen(url)
         data = fh.read()
         fh.close()
         sidx = data.find('<SELECT NAME="eqidlist"')
@@ -156,14 +156,14 @@ class KNETFetcher(StrongMotionFetcher):
             cdict = CGIPARAMS.copy()
             cdict['eqidlist'] = value
             cdict['datanames'] = value.split(',')[0].strip()
-            cparams = urllib.urlencode(cdict)
+            cparams = urllib.parse.urlencode(cdict)
             #something strange and important about the placement and format of the "alldata" parameter
             cparams = cparams.replace('&alldata=None','%3Balldata')
             requesturl = CGI % cparams
-            req = urllib2.Request(requesturl)
+            req = urllib.request.Request(requesturl)
             base64string = base64.encodestring('%s:%s' % (user, password))[:-1]
             req.add_header("Authorization", "Basic %s" % base64string)
-            handle = urllib2.urlopen(req)
+            handle = urllib.request.urlopen(req)
             data = handle.read()
             handle.close()
             localfile = os.path.join(os.getcwd(),dtime.strftime('%Y%m%d%H%M%S')+'.tar')
@@ -185,15 +185,15 @@ class KNETFetcher(StrongMotionFetcher):
         monthstr = '%02i' % jptime.month
         url = url.replace('[YEAR]',yearstr)
         url = url.replace('[MONTH]',monthstr)
-        urlparts = urlparse.urlparse(url)
+        urlparts = urllib.parse.urlparse(url)
         ftp = ftplib.FTP(urlparts.netloc)
         ftp.login(user,password)
         dirparts = urlparts.path.strip('/').split('/')
         for d in dirparts:
             try:
                 ftp.cwd(d)
-            except ftplib.error_perm,msg:
-                raise Exception,msg
+            except ftplib.error_perm as msg:
+                raise Exception(msg)
         ftpfiles = ftp.nlst()
         localfile = None
         for ftpfile in ftpfiles:
@@ -264,7 +264,7 @@ def readheader(hdrlines):
             channel = parts[1].replace('-','')
             kiknetcomps = {'1':'NS1','2':'EW1','3':'UD1',
                            '4':'NS2','5':'EW2','6':'UD2'}
-            if channel.strip() in kiknetcomps.keys(): #kiknet directions are 1-6
+            if channel.strip() in list(kiknetcomps.keys()): #kiknet directions are 1-6
                 channel = kiknetcomps[channel.strip()]
             hdrdict['channel'] = channel
         if line.startswith('Scale Factor'):

@@ -2,11 +2,11 @@
 
 #stdlib imports
 import os.path
-import urllib2
-import urlparse
+import urllib.request, urllib.error, urllib.parse
+import urllib.parse
 from xml.dom.minidom import parseString
 import sys
-import StringIO
+import io
 import argparse
 import json
 import datetime
@@ -122,7 +122,7 @@ def parseJSONInfo(jsondata):
     jdict = json.loads(jsondata)
     faultfile = jdict['input']['event_information']['faultfiles']
     sources = {'mech':jdict['input']['event_information']['src_mech']}
-    grind = {}
+    grind = {'strictbound':''}
     args = {}
     args['directivity'] = jdict['processing']['ground_motion_modules']['directivity']['module']
     grind['basin_module'] = jdict['processing']['ground_motion_modules']['basin_correction']['module']
@@ -274,7 +274,7 @@ def parseOldInfo(root):
     return (grind,args,sources,faultfile)
 
 def parseInfo20(root):
-    grind = {'vs30':686.0}
+    grind = {'vs30':686.0,'strictbound':''}
     args = {'qtm':'True',
             'directivity':False} #grind command line arguments
     sources = {'mech':'ALL'}
@@ -349,11 +349,11 @@ def parseInfo20(root):
                  
 def readInfo(infourl):
     try:
-        fh = urllib2.urlopen(infourl)
-        infoxml = fh.read()
+        fh = urllib.request.urlopen(infourl)
+        infoxml = fh.read().decode('utf-8')
         fh.close()
     except:
-        raise Exception,'The supplemental file %s does not exist.' % infourl
+        raise Exception('The supplemental file %s does not exist.' % infourl)
     
     if infourl.endswith('.xml'):
         root = parseString(infoxml)
@@ -371,22 +371,24 @@ def readInfo(infourl):
     return (grind,args,sources,faultfile)
 
 def getEventInfo(gridurl):
-    gridfh = urllib2.urlopen(gridurl)
-    gdata = gridfh.read()
+    gridfh = urllib.request.urlopen(gridurl)
+    gdata = gridfh.read().decode('utf-8')
     gridfh.close()
 
     gdata = gdata[0:gdata.find('<grid_data>')] + '</shakemap_grid>'
     xdom = parseString(gdata)
     root = xdom.getElementsByTagName('shakemap_grid')[0]
     infodict = {}
-    id = root.getAttribute('event_id').lower().replace('.', 'p')
-    id = "".join(x for x in id if x.isalnum())
-    if id[-3:] != '_se':
-        if id[-2:] == 'se':
-            id = id[:-2] + '_se'
-        else:
-            id = id + '_se'
-    infodict['id'] = id
+    eventid = root.getAttribute('event_id')
+    net = root.getAttribute('shakemap_originator')
+    if not eventid.startswith(net):
+        eventid = net + eventid
+    if eventid.lower().endswith('_se'):
+        eventid = eventid.lower().replace('.', 'p')
+        eventid = "".join(x for x in eventid if x.isalnum())
+        eventid = eventid[:-2] + '_se'
+
+    infodict['id'] = eventid
     event = root.getElementsByTagName('event')[0]
     gridspec = root.getElementsByTagName('grid_specification')[0]
     infodict['lat'] = float(event.getAttribute('lat'))
@@ -428,7 +430,7 @@ def writeEvent(grind,args,sources,faultfile,faulturl,stationurl,eventdict,shakeh
 
     if pargs.estimates is True:
         # Create *_estimates.grd from grid.xml
-        gridfh = urllib2.urlopen(gridurl)
+        gridfh = urllib.request.urlopen(gridurl)
         sg = ShakeGrid.load(gridfh, adjust = "res")
         gridfh.close()
         dat = sg.getData()
@@ -472,14 +474,14 @@ def writeEvent(grind,args,sources,faultfile,faulturl,stationurl,eventdict,shakeh
                 break
     
         gstr = GRIND_TEMPLATE
-        for key,value in grind.iteritems():
+        for key,value in grind.items():
             if (pargs.estimates is True) and (key is 'use_gmpe_sc'):
                 gstr = gstr.replace('['+key.upper()+']','false')
             else:
                 gstr = gstr.replace('['+key.upper()+']',str(value))
             
         # Need to handle bounds separately...
-        if 'map_bound' in grind.keys():
+        if 'map_bound' in list(grind.keys()):
             mbsp = grind['map_bound'].split('/')
             bstr = 'strictbound : ' + mbsp[0] + ' ' +  mbsp[2] + ' ' +  mbsp[1] + ' ' + mbsp[3]
         else:
@@ -490,13 +492,13 @@ def writeEvent(grind,args,sources,faultfile,faulturl,stationurl,eventdict,shakeh
         pat = '\[([^]]+)\]'
         unfilled = re.findall(pat,gstr)
         if len(unfilled):
-            print('Did not fill in all macros with values, missing "%s".' % str(unfilled))
+            print(('Did not fill in all macros with values, missing "%s".' % str(unfilled)))
             if pargs.missing is False: 
                 sys.exit(1)
         f = open(grindfile,'wt')
         f.write(gstr)
         f.close()
-        print('Writing grind config to %s' % grindfile)
+        print(('Writing grind config to %s' % grindfile))
     else:
         print('No grind information found.')
         
@@ -504,16 +506,16 @@ def writeEvent(grind,args,sources,faultfile,faulturl,stationurl,eventdict,shakeh
     eventfile = os.path.join(inputdir,'event.xml')
     f = open(eventfile,'wt')
     estr = EVENT_TEMPLATE
-    for key,value in eventdict.iteritems():
+    for key,value in eventdict.items():
         estr = estr.replace('['+key.upper()+']',str(value))
     estr = estr.replace('[NET]', pargs.network)
     f.write(estr)
     f.close()
-    print('Writing input file to %s' % eventfile)
+    print(('Writing input file to %s' % eventfile))
 
     #write stationlist.xml file (if it exists)
     try:
-        fh = urllib2.urlopen(stationurl)
+        fh = urllib.request.urlopen(stationurl)
         data = fh.read()
         fh.close()
         datafile = os.path.join(inputdir,'stationlist.xml')
@@ -525,8 +527,8 @@ def writeEvent(grind,args,sources,faultfile,faulturl,stationurl,eventdict,shakeh
     
     #write fault file
     try:
-        fh = urllib2.urlopen(faulturl)
-        parts = urlparse.urlparse(faulturl)
+        fh = urllib.request.urlopen(faulturl)
+        parts = urllib.parse.urlparse(faulturl)
         fpath = parts.path
         fbase,fname = os.path.split(fpath)
         faultfile = os.path.join(inputdir,fname)
@@ -535,14 +537,14 @@ def writeEvent(grind,args,sources,faultfile,faulturl,stationurl,eventdict,shakeh
         f = open(faultfile,'wt')
         f.write(data)
         f.close()
-        print('Writing fault file to %s' % faultfile)
+        print(('Writing fault file to %s' % faultfile))
     except:
         print('No fault file found.')
 
     #Write sources.txt file
     sourcefile = os.path.join(inputdir,'source.txt')
     f = open(sourcefile,'wt')
-    for key,value in sources.iteritems():
+    for key,value in sources.items():
         f.write('%s = %s\n' % (key,value))
     f.close()
     
@@ -550,20 +552,23 @@ def writeEvent(grind,args,sources,faultfile,faulturl,stationurl,eventdict,shakeh
     runfile = os.path.join(datadir,'RUNFILE.sh')
     f = open(runfile,'wt')
     if pargs.estimates is True:
-        RUN_TEMPLATE = RUN_TEMPLATE_EST
-    runtext = RUN_TEMPLATE.replace('[EVENT]',eventdict['id'])
+        template = RUN_TEMPLATE_EST
+    else:
+        template = RUN_TEMPLATE
+
+    runtext = template.replace('[EVENT]',eventdict['id'])
     runtext = runtext.replace('[SHAKEHOME]',shakehome)
-    if args.has_key('qtm') and args['qtm'] and (pargs.estimates is False):
+    if 'qtm' in args and args['qtm'] and (pargs.estimates is False):
         runtext = runtext.replace('[QTM]','-qtm')
     else:
         runtext = runtext.replace('[QTM]','')
-    if args.has_key('directivity') and args['directivity']:
+    if 'directivity' in args and args['directivity']:
         runtext = runtext.replace('[DIRECTIVITY]','-directivity')
     else:
         runtext = runtext.replace('[DIRECTIVITY]','')
     if pargs.estimates is True:
         runtext = runtext.replace('[GMPE]', grind['gmpe'])
-        if ('ipe' in grind.keys()) or (pargs.missing is False):
+        if ('ipe' in list(grind.keys())) or (pargs.missing is False):
             runtext = runtext.replace('[IPE]', grind['ipe'])
         runtext = runtext.replace('[SITE]', grind['site_correction'])
     f.write(runtext)
@@ -573,13 +578,13 @@ def writeEvent(grind,args,sources,faultfile,faulturl,stationurl,eventdict,shakeh
 
 def getShakeURLs(shakeurl):
     urlt = 'http://earthquake.usgs.gov/fdsnws/event/1/query?eventid=[EVENTID]&format=geojson'
-    eventid = urlparse.urlparse(shakeurl).path.strip('/').split('/')[-1]
+    eventid = urllib.parse.urlparse(shakeurl).path.strip('/').split('/')[-1]
     url = urlt.replace('[EVENTID]',eventid)
-    fh = urllib2.urlopen(url)
-    data = fh.read()
+    fh = urllib.request.urlopen(url)
+    data = fh.read().decode('utf-8')
     jdict = json.loads(data)
     fh.close()
-    contentlist = jdict['properties']['products']['shakemap'][0]['contents'].keys()
+    contentlist = list(jdict['properties']['products']['shakemap'][0]['contents'].keys())
     infourl = None
     gridurl = None
     stationurl = None
@@ -616,19 +621,19 @@ def main(args):
         shakehome = os.path.join(os.path.expanduser('~'),'ShakeMap')
     if not os.path.isdir(shakehome):
         msg = 'Could not find a ShakeMap installation at %s.  Specify the location of your ShakeMap installation with -s.'
-        print(msg % (shakehome))
+        print((msg % (shakehome)))
         sys.exit(1)
     #Is this a scenario?
     if shakeurl.find('_se') > -1:
-        infourl = urlparse.urljoin(shakeurl,'download/info.xml')
-        gridurl = urlparse.urljoin(shakeurl,'download/grid.xml')
-        stationurl = urlparse.urljoin(shakeurl,'download/stationlist.xml')
+        infourl = urllib.parse.urljoin(shakeurl,'download/info.xml')
+        gridurl = urllib.parse.urljoin(shakeurl,'download/grid.xml')
+        stationurl = urllib.parse.urljoin(shakeurl,'download/stationlist.xml')
         try:
             grind,args,sources,faultfile = readInfo(infourl)
-        except Exception,error:
-            print('There was a problem trying to clone the ShakeMap.\nError message:\n"%s".\nExiting.' % error.message)
+        except Exception as error:
+            print(('There was a problem trying to clone the ShakeMap.\nError message:\n"%s".\nExiting.' % error.message))
             sys.exit(1)
-        faulturl = urlparse.urljoin(shakeurl,'download/%s' % faultfile)
+        faulturl = urllib.parse.urljoin(shakeurl,'download/%s' % faultfile)
     else:
         infourl,faulturl,gridurl,stationurl = getShakeURLs(shakeurl)
         if infourl is not None:
@@ -646,8 +651,9 @@ def main(args):
         grind['lonspan'] = eventdict['lon_max'] - eventdict['lon_min']
         grind['x_grid_interval'] = eventdict['lon_spacing']
         grind['y_grid_interval'] = eventdict['lat_spacing']
+
     writeEvent(grind,args,sources,faultfile,faulturl,stationurl,eventdict,shakehome,gridurl,pargs)
-    print('Cloning completed.\nTo run this event, do:\nsh %s/data/%s/RUNFILE.sh' % (shakehome,eventdict['id']))
+    print(('Cloning completed.\nTo run this event, do:\nsh %s/data/%s/RUNFILE.sh' % (shakehome,eventdict['id'])))
     
 
 if __name__ == '__main__':
@@ -674,6 +680,6 @@ Examples:
                         help='allow missing tags from info.xml; default is False; use of this option is for cloning very old shakemaps (usually with -e) for which the info.xml is not complete.')
     pargs = parser.parse_args()
     if not pargs.url:
-        print(parser.print_help())
+        print((parser.print_help()))
         sys.exit(1)
     main(pargs)

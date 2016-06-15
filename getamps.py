@@ -14,10 +14,10 @@ SUPPORTED_NETWORKS = {'taiwan':'Taiwan Central Weather Bureau'}
 
 def main(args):
     if args.listSources:
-        print '%-15s\t%-40s' % ('Network','Description')
-        print '------------------------------------------'
-        for key,value in SUPPORTED_NETWORKS.iteritems():
-            print '%-15s\t%-40s' % (key,value)
+        print('%-15s\t%-40s' % ('Network','Description'))
+        print('------------------------------------------')
+        for key,value in SUPPORTED_NETWORKS.items():
+            print('%-15s\t%-40s' % (key,value))
         sys.exit(0)
 
     if args.folder:
@@ -26,7 +26,7 @@ def main(args):
         outfolder = os.getcwd()
 
     if not args.inputFolder:
-        print 'Must specify input folder with -i.'
+        print('Must specify input folder with -i.')
         sys.exit(1)
 
     if args.source == 'taiwan':
@@ -34,7 +34,7 @@ def main(args):
         for txtfile in txtfiles:
             stationlist = readTaiwan(txtfile)
             datafile,tag = amps2xml(stationlist,outfolder,'CWB')
-            print 'Created data file %s.' % datafile
+            print('Created data file %s.' % datafile)
     sys.exit(0)
         
 if __name__ == '__main__':

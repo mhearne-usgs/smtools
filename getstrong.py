@@ -8,7 +8,7 @@ warnings.simplefilter("ignore", DeprecationWarning)
 import sys
 import tarfile
 from datetime import datetime,timedelta
-from ConfigParser import ConfigParser,RawConfigParser
+from configparser import ConfigParser,RawConfigParser
 import os.path
 import argparse
 import glob
@@ -40,11 +40,11 @@ SUPPORTED_NETWORKS = {'knet':'Japanese Strong Motion (NIED)',
                       'pickle':'Calibrated strong motion data from any source',}
 
 def doConfig():
-    shakehome = raw_input('Please specify the root folder where ShakeMap is installed: ')
+    shakehome = input('Please specify the root folder where ShakeMap is installed: ')
     if not os.path.isdir(shakehome):
-        print '%s is not a valid path.  Returning.' % shakehome
-    user = raw_input('Please specify K-NET user name: ')
-    password = raw_input('Please specify K-NET password: ')
+        print('%s is not a valid path.  Returning.' % shakehome)
+    user = input('Please specify K-NET user name: ')
+    password = input('Please specify K-NET password: ')
     config = RawConfigParser()
     config.add_section('KNET')
     config.add_section('SHAKEMAP')
@@ -81,34 +81,34 @@ def getOutFolders(args,config):
 def printTag(tag):
     for stationtag in tag.getChildren('station'):
         atts = stationtag.attributes
-        print '%s - %s %.4f,%.4f' % (atts['code'],atts['name'],atts['lat'],atts['lon'])
+        print('%s - %s %.4f,%.4f' % (atts['code'],atts['name'],atts['lat'],atts['lon']))
         comptag = stationtag.getChildren('comp')[0]
         veltag = comptag.getChildren('vel')[0]
         acctag = comptag.getChildren('acc')[0]
         psa03tag = comptag.getChildren('psa03')[0]
         psa10tag = comptag.getChildren('psa10')[0]
         psa30tag = comptag.getChildren('psa30')[0]
-        print '\tPeak Acceleration: %f' % (acctag.attributes['value'])
-        print '\tPeak Velocity: %f' % (veltag.attributes['value'])
-        print '\tPSA 0.3: %f' % (psa03tag.attributes['value'])
-        print '\tPSA 1.0: %f' % (psa10tag.attributes['value'])
-        print '\tPSA 3.0: %f' % (psa30tag.attributes['value'])
-        print
+        print('\tPeak Acceleration: %f' % (acctag.attributes['value']))
+        print('\tPeak Velocity: %f' % (veltag.attributes['value']))
+        print('\tPSA 0.3: %f' % (psa03tag.attributes['value']))
+        print('\tPSA 1.0: %f' % (psa10tag.attributes['value']))
+        print('\tPSA 3.0: %f' % (psa30tag.attributes['value']))
+        print()
         
 def main(args,config):
     if args.listSources:
-        print '%-15s\t%-40s' % ('Network','Description')
-        print '------------------------------------------'
-        for key,value in SUPPORTED_NETWORKS.iteritems():
-            print '%-15s\t%-40s' % (key,value)
+        print('%-15s\t%-40s' % ('Network','Description'))
+        print('------------------------------------------')
+        for key,value in SUPPORTED_NETWORKS.items():
+            print('%-15s\t%-40s' % (key,value))
         sys.exit(0)
         
     if args.doConfig:
         doConfig()
         sys.exit(0)
     if args.eventID and config is None:
-        print 'To specify event ID, you must have configured the ShakeHome parameter in the config file.'
-        print 'Re-run with -config.  Returning.'
+        print('To specify event ID, you must have configured the ShakeHome parameter in the config file.')
+        print('Re-run with -config.  Returning.')
         sys.exit(1)
 
     #Get the output folder
@@ -117,11 +117,11 @@ def main(args,config):
         os.makedirs(rawfolder)
 
     if args.eventID and (hasattr(args,'time') or hasattr(args,'lat') or hasattr(args,'lon')):
-        print 'Supply EITHER eventID OR time,lat,lon - not both'
+        print('Supply EITHER eventID OR time,lat,lon - not both')
         sys.exit(1)
 
     if (args.user and not args.password) or (args.password and not args.user):
-        print 'You must supply both KNET username AND password'
+        print('You must supply both KNET username AND password')
         sys.exit(1)
         
     if args.eventID:
@@ -143,7 +143,7 @@ def main(args,config):
         if args.source == 'orfeus':
             stationlist = orfeus.getAmps(lat,lon,etime,args.timeWindow,args.radius)
             outfile,stationlist_tag = trace2xml.amps2xml(stationlist,outfolder,'orfeus')
-            print 'Retrieved peak ground motions from %i European stations' % len(stationlist)
+            print('Wrote amps from %i stations to data file %s\n' % (len(stationlist),outfile))
             sys.exit(0)
         if args.source == 'knet':
             if not args.user:
@@ -161,43 +161,43 @@ def main(args,config):
             sys.stderr.write('Fetching strong motion data from Turkey...\n')
             fetcher = turkey.TurkeyFetcher()
         elif args.source == 'iran':
-            print 'Automated downloading of Iran strong motion data is not supported.  Use the -i option instead.'
-            print 'Obtain strong motion records from: http://www.bhrc.ac.ir/portal/Default.aspx?tabid=635'
+            print('Automated downloading of Iran strong motion data is not supported.  Use the -i option instead.')
+            print('Obtain strong motion records from: http://www.bhrc.ac.ir/portal/Default.aspx?tabid=635')
             sys.exit(1)
         elif args.source == 'sac':
-            print 'Automated downloading of SAC strong motion data is not supported.  Use the -i option instead.'
-            print 'SAC is a data standard, not a source.  You will need to have obtained SAC data from your own source.'
+            print('Automated downloading of SAC strong motion data is not supported.  Use the -i option instead.')
+            print('SAC is a data standard, not a source.  You will need to have obtained SAC data from your own source.')
             sys.exit(1)
         elif args.source == 'chile':
-            print 'Automated downloading of Chilean calibrated ASCII strong motion data is not supported.  Use the -i option instead.'
+            print('Automated downloading of Chilean calibrated ASCII strong motion data is not supported.  Use the -i option instead.')
             sys.exit(1)
         elif args.source == 'pickle':
-            print 'Automated downloading of Chilean calibrated ASCII strong motion data is not supported.  Use the -i option instead.'
+            print('Automated downloading of Chilean calibrated ASCII strong motion data is not supported.  Use the -i option instead.')
             sys.exit(1)
         elif args.source == 'iris':
             sys.stderr.write('Fetching strong motion and broadband data from IRIS...\n')
             fetcher = iris.IrisFetcher(verbose=args.verbose) #will get strong motion AND broadband
         elif args.source == 'italy':
-            print 'Automated downloading of Italian strong motion data is not supported.  Use the -i option instead.'
+            print('Automated downloading of Italian strong motion data is not supported.  Use the -i option instead.')
             sys.exit(1)
         elif args.source == 'unam':
-            print 'Automated downloading of Mexican (UNAM) strong motion data is not supported.  Use the -i option instead.'
+            print('Automated downloading of Mexican (UNAM) strong motion data is not supported.  Use the -i option instead.')
             sys.exit(1)
         else:
-            print 'Data source %s not supported.' % args.source
+            print('Data source %s not supported.' % args.source)
             sys.exit(1)
         try:
             datafiles = fetcher.fetch(lat,lon,etime,args.radius,args.timeWindow,rawfolder)
-        except Exception,e:
-            print '(Possible) error in trying to download data from %s.  \n"%s"\n' % (args.source,str(e))
+        except Exception as e:
+            print('(Possible) error in trying to download data from %s.  \n"%s"\n' % (args.source,str(e)))
         sys.stderr.write('Retrieved %i files.\n' % len(datafiles))
     else: 
         
         if not os.path.isdir(args.inputFolder):
-            print 'Could not find folder "%s".  Exiting.' % args.inputFolder
+            print('Could not find folder "%s".  Exiting.' % args.inputFolder)
             sys.exit(1)
         if args.source == 'orfeus':
-            print 'Offline data processing not supported for Orfeus.'
+            print('Offline data processing not supported for Orfeus.')
             sys.exit(1)
         if args.source == 'knet':
             datafiles1 = glob.glob(os.path.join(args.inputFolder,'*.NS'))
@@ -231,7 +231,7 @@ def main(args,config):
             respfiles = glob.glob(os.path.join(args.inputFolder,'*.resp'))
             if not len(seedfiles):
                 if not len(respfiles):
-                    print 'A dataless SEED file (ending in .seed) or a RESP file (ending in .resp) must be supplied with input SAC files. Exiting.'
+                    print('A dataless SEED file (ending in .seed) or a RESP file (ending in .resp) must be supplied with input SAC files. Exiting.')
                     sys.exit(1)
                 else:
                     seedresp = {'filename': respfiles[0],  # RESP filename
@@ -251,7 +251,7 @@ def main(args,config):
                 if re.match('\d',fext[1:]) is not None:
                     datafiles.append(dfile)
         else:
-            print 'Data source %s not supported.' % args.source
+            print('Data source %s not supported.' % args.source)
             sys.exit(1)
         
     
@@ -295,7 +295,7 @@ def main(args,config):
             for trace in stream:
                 traces.append(trace)
         else:
-            print 'Source %s is not supported' % (args.source)
+            print('Source %s is not supported' % (args.source))
             sys.exit(1)
     if len(datafiles):
         sys.stderr.write('Converting %i files to peak ground motion...\n' % len(datafiles))

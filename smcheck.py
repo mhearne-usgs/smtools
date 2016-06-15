@@ -4,7 +4,7 @@
 import sys
 import os.path
 import glob
-from ConfigParser import ConfigParser,RawConfigParser
+from configparser import ConfigParser,RawConfigParser
 import argparse
 
 #third party imports

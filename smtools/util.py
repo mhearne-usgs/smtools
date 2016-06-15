@@ -14,7 +14,7 @@ def maketime(timestring):
         try:
             outtime = datetime.strptime(timestring,DATEFMT)
         except:
-            raise Exception,'Could not parse time or date from %s' % timestring
+            raise Exception('Could not parse time or date from %s' % timestring)
     return outtime
 
 def parseEvent(eventxml):
@@ -62,7 +62,7 @@ class ValidateParams(argparse.Action):
         etimestr, latstr,lonstr = values
         try:
             etime = maketime(etimestr)
-        except Exception,instance:
+        except Exception as instance:
             raise ValueError('Invalid time string %s' % etimestr)
         try:
             lat = float(latstr)

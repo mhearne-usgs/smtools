@@ -38,8 +38,8 @@ def trim(toff):
     fpath,fname = os.path.split(CURRENT_FILE)
     fname,fext = os.path.splitext(fname)
     outfile = os.path.join(fpath,fname+'.pickle')
-    print 'Trimming trace from %s to %s' % (stime,etime)
-    print 'Saving trimmed file to %s' % outfile
+    print('Trimming trace from %s to %s' % (stime,etime))
+    print('Saving trimmed file to %s' % outfile)
     TRACE.write(outfile,format='PICKLE')
     
     
@@ -50,7 +50,7 @@ def onclick(event):
     if event.button == 1: #left button to mark
         XCLICK = event.xdata
         YCLICK = event.ydata
-        print 'Clip Time: %s' % (TRACE.stats['starttime'] + event.xdata)
+        print('Clip Time: %s' % (TRACE.stats['starttime'] + event.xdata))
         plt.gca()
         xmin,xmax,ymin,ymax = plt.axis()
         plt.plot([event.xdata,event.xdata],[ymin,ymax],'r')
@@ -61,7 +61,7 @@ def onclick(event):
 
 def main(args):
     if args.doTrim is False:
-        print 'Select the pre-processing option you want to use.  See help for list of currently supported options.'
+        print('Select the pre-processing option you want to use.  See help for list of currently supported options.')
         sys.exit(1)
     for dfile in args.files:
         global CURRENT_FILE
@@ -101,7 +101,7 @@ def main(args):
             for trace in stream:
                 traces.append(trace)
         else:
-            print 'Source %s is not supported' % (args.source)
+            print('Source %s is not supported' % (args.source))
             sys.exit(1)
         for trace in traces:
             global TRACE

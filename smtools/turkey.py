@@ -10,9 +10,9 @@ import sys
 import re
 from datetime import datetime,timedelta
 from xml.dom import minidom
-import urllib
-import urllib2
-import urlparse
+import urllib.request, urllib.parse, urllib.error
+import urllib.request, urllib.error, urllib.parse
+import urllib.parse
 import base64
 
 #third party
@@ -24,9 +24,9 @@ from obspy.core.trace import Stats
 import matplotlib.pyplot as plt
 
 #local
-from fetcher import StrongMotionFetcher,StrongMotionFetcherException
-from trace2xml import trace2xml
-import util
+from .fetcher import StrongMotionFetcher,StrongMotionFetcherException
+from .trace2xml import trace2xml
+from . import util
 
 #default Turkey spatial search parameters
 LATMIN = 35.81
@@ -49,25 +49,25 @@ class TurkeyFetcher(StrongMotionFetcher):
         htmldata = self.getSearchPage(utctime,lat,lon,radius)
         if htmldata.lower().find("no records found") > -1:
             msg = 'No records found in Turkey database.  Returning.'
-            print msg
+            print(msg)
             datafiles = []
             return datafiles
         xmldata = self.getSearchXML(htmldata)
         matchingEvent = self.getMatchingEvent(xmldata,utctime,lat,lon,timewindow,radius)
         if matchingEvent is None:
             msg = 'Failed to find matching event in Turkey database.  Returning.'
-            print msg
+            print(msg)
             datafiles = []
             return datafiles
 
-        urlparts = urlparse.urlparse(URLBASE)
-        url = urlparse.urljoin(urlparts.geturl(),matchingEvent['href'])
+        urlparts = urllib.parse.urlparse(URLBASE)
+        url = urllib.parse.urljoin(urlparts.geturl(),matchingEvent['href'])
         urllist = self.getDataLinks(url)
         datafiles = []
         for urltpl in urllist:
             url = urltpl[0]
             station = urltpl[1]
-            fh = urllib2.urlopen(url)
+            fh = urllib.request.urlopen(url)
             data = fh.read()
             fh.close()
             fname = '%s_%s.txt' % (utctime.strftime('%Y%m%d%H%M%S'),station)
@@ -80,7 +80,7 @@ class TurkeyFetcher(StrongMotionFetcher):
         return datafiles
 
     def getSearchPage(self,utctime,lat,lon,distwindow):
-        values = {'from_day':01,'from_month':01,'from_year':2011,
+        values = {'from_day':0o1,'from_month':0o1,'from_year':2011,
                   'from_md':'','to_md':'',
                   'to_day':31,'to_month':12,'to_year':2011,
                   'from_ml':'','to_ml':'',
@@ -107,9 +107,9 @@ class TurkeyFetcher(StrongMotionFetcher):
         values['to_epi_lat'] = ymax
         values['from_epi_lon'] = xmin
         values['to_epi_lon'] = xmax
-        data = urllib.urlencode(values)
-        req = urllib2.Request(URLBASE,data)
-        response = urllib2.urlopen(req)
+        data = urllib.parse.urlencode(values).encode('ascii')
+        req = urllib.request.Request(URLBASE,data)
+        response = urllib.request.urlopen(req)
         htmldata = response.read()
         return htmldata
 
@@ -186,13 +186,13 @@ class TurkeyFetcher(StrongMotionFetcher):
             dd,az1,az2 = gps2DistAzimuth(lat,lon,event['lat'],event['lon'])
             dd = dd/1000.0
             if dtsecs < timewindow and dd < distwindow:
-                print 'The most likely matching event is %s' % event['id']
+                print('The most likely matching event is %s' % event['id'])
                 matchingEvent = event.copy()
                 break
         return matchingEvent
 
     def getDataLinks(self,url):
-        fh = urllib2.urlopen(url)
+        fh = urllib.request.urlopen(url)
         htmldata = fh.read()
         fh.close()
         xmldata2 = self.getSearchXML(htmldata)
@@ -211,9 +211,9 @@ class TurkeyFetcher(StrongMotionFetcher):
                 if colidx == 1:
                     anchor = td.getElementsByTagName('a')[0]
                     href = anchor.getAttribute('href')
-                    urlparts = urlparse.urlparse(URLBASE)
-                    url = urlparse.urljoin(urlparts.geturl(),href)
-                    fh = urllib2.urlopen(url)
+                    urlparts = urllib.parse.urlparse(URLBASE)
+                    url = urllib.parse.urljoin(urlparts.geturl(),href)
+                    fh = urllib.request.urlopen(url)
                     htmldata2 = fh.read()
                     fh.close()
                     startidx = 0
@@ -227,7 +227,7 @@ class TurkeyFetcher(StrongMotionFetcher):
                             continue
                         else:
                             break
-                    url = urlparse.urljoin(urlparts.geturl(),href)
+                    url = urllib.parse.urljoin(urlparts.geturl(),href)
                     urllist.append(url)
                 if colidx == 6:
                     anchor = td.getElementsByTagName('a')[0]
@@ -235,7 +235,7 @@ class TurkeyFetcher(StrongMotionFetcher):
                     stationlist.append(station)
                 colidx += 1
         root.unlink()
-        urltuples = zip(urllist,stationlist)
+        urltuples = list(zip(urllist,stationlist))
         return urltuples
 
     def strip_non_ascii(self,string):

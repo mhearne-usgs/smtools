@@ -2,7 +2,7 @@
 
 #stdlib imports
 from datetime import datetime,timedelta
-import urllib2
+import urllib.request, urllib.error, urllib.parse
 from xml.dom import minidom
 import os.path
 import re
@@ -12,7 +12,7 @@ import math
 
 #local imports
 from neicmap.distance import sdist
-from trace2xml import amps2xml
+from .trace2xml import amps2xml
 
 #third party
 from bs4 import BeautifulSoup
@@ -27,8 +27,8 @@ TIMEFMT = '%Y-%m-%d %H:%M:%S'
 FLOATPAT = '[+-]?(?=\d*[.eE])(?=\.?\d)\d*\.?\d*(?:[eE][+-]?\d+)?'
 
 def getEventList(url):
-    fh = urllib2.urlopen(url)
-    data = fh.read()
+    fh = urllib.request.urlopen(url)
+    data = fh.read().decode('utf-8')
     fh.close()
     tstart = data.find('<tbody>')
     tend = data.find('</tbody>')+len('</tbody>')
@@ -38,7 +38,7 @@ def getEventList(url):
     xmlstr = xmlstr.replace('&','')
     try:
         root = minidom.parseString(xmlstr)
-    except Exception,msg:
+    except Exception as msg:
         pass
     rows = root.getElementsByTagName('tr')
     eventlist = []
@@ -56,8 +56,8 @@ def getEventList(url):
     return eventlist
 
 def getChannels(durl):
-    fh = urllib2.urlopen(durl)
-    data = fh.read()
+    fh = urllib.request.urlopen(durl)
+    data = fh.read().decode('utf-8')
     fh.close()
     tstart = data.find('<tbody>')
     tend = data.find('</tbody>')+len('</tbody>')
@@ -98,8 +98,8 @@ def getNumber(numberstr):
     return number
 
 def getStationList(eurl,eventid):
-    fh = urllib2.urlopen(eurl)
-    data = fh.read()
+    fh = urllib.request.urlopen(eurl)
+    data = fh.read().decode('utf-8')
     fh.close()
     tstart = data.find('<tbody>')
     tend = data.find('</tbody>')+len('</tbody>')
@@ -159,7 +159,7 @@ def getAmps(lat,lon,etime,radius,timewindow):
             eventid = event['id']
             break
     if eventid is None:
-        print 'No events found matching your criteria.'
+        print('No events found matching your criteria.')
         return []
     eurl = EVENTURL.replace('[EVENTID]',eventid)
     stationlist = getStationList(eurl,eventid)
@@ -169,7 +169,7 @@ if __name__ == '__main__':
     url = sys.argv[1]
     url = url.replace('#summary','')
     url += '.json'
-    fh = urllib2.urlopen(url)
+    fh = urllib.request.urlopen(url)
     data = fh.read()
     fh.close()
     jdict = json.loads(data)

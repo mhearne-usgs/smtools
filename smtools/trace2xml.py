@@ -86,10 +86,10 @@ def amps2xml(stationlist,outfolder,netsource):
                                                'netid':net,'commtype':'DIG',
                                                'lat':lat,'lon':lon,
                                                'loc':name})
-        for channelkey,channeldict in channels.iteritems():
+        for channelkey,channeldict in channels.items():
             comptag = Tag('comp',attributes={'name':channelkey})
             for key in ['pga','pgv','psa03','psa10','psa30']:
-                if channels.has_key(key):
+                if key in channeldict:
                     channelvalue = channeldict[key]
                     if key == 'pga':
                         tkey = 'acc'
@@ -166,7 +166,7 @@ def trace2xml(traces,parser,outfolder,netsource,doPlot=False,seedresp=None):
                     pre_filt = (0.01, 0.02, 20, 30)
                     try:
                         trace.simulate(paz_remove=None, pre_filt=pre_filt, seedresp=seedresp)
-                    except Exception,error:
+                    except Exception as error:
                         pass
 
         #make the component tag to hold the measurements
@@ -298,7 +298,7 @@ def trace2xml(traces,parser,outfolder,netsource,doPlot=False,seedresp=None):
     if not first_station:	# Add the final station to the list
         stationlist_tag.addChild(stationtag)
     outfile = os.path.join(outfolder,'%s_dat.xml' % netsource)
-    print 'Saving to %s' % outfile
+    print('Saving to %s' % outfile)
     stationlist_tag.renderToXML(filename=outfile,ntabs=1)
     return (outfile,plotfiles,stationlist_tag)
 

@@ -8,14 +8,14 @@ warnings.simplefilter("ignore", DeprecationWarning)
 from datetime import datetime,timedelta
 import sys
 import os.path
-import urlparse
+import urllib.parse
 import ftplib
-import urllib2
+import urllib.request, urllib.error, urllib.parse
 
 #local
-from fetcher import StrongMotionFetcher,StrongMotionFetcherException
-from trace2xml import trace2xml
-import util
+from .fetcher import StrongMotionFetcher,StrongMotionFetcherException
+from .trace2xml import trace2xml
+from . import util
 
 #third party
 from obspy.core.trace import Trace
@@ -61,15 +61,15 @@ class GeonetFetcher(StrongMotionFetcher):
         neturl = GEOBASE.replace('[YEAR]',str(utctime.year))
         monthstr = utctime.strftime('%m_%b')
         neturl = neturl.replace('[MONTH]',monthstr)
-        urlparts = urlparse.urlparse(neturl)
+        urlparts = urllib.parse.urlparse(neturl)
         ftp = ftplib.FTP(urlparts.netloc)
         ftp.login() #anonymous
         dirparts = urlparts.path.strip('/').split('/')
         for d in dirparts:
             try:
                 ftp.cwd(d)
-            except ftplib.error_perm,msg:
-                raise Exception,msg
+            except ftplib.error_perm as msg:
+                raise Exception(msg)
 
         #cd to the desired output folder
         os.chdir(outfolder)
@@ -81,7 +81,7 @@ class GeonetFetcher(StrongMotionFetcher):
         try:
             ftp.cwd(fname)
         except:
-            msg = 'Could not find an FTP data folder called "%s". Returning.' % (urlparse.urljoin(neturl,fname))
+            msg = 'Could not find an FTP data folder called "%s". Returning.' % (urllib.parse.urljoin(neturl,fname))
             raise StrongMotionFetcherException(msg)
 
         volumes = []
@@ -119,8 +119,8 @@ class GeonetFetcher(StrongMotionFetcher):
         url = CATBASE.replace('[START]',stime.strftime(TIMEFMT))
         url = url.replace('[END]',etime.strftime(TIMEFMT))
         try:
-            fh = urllib2.urlopen(url)
-            data = fh.read()
+            fh = urllib.request.urlopen(url)
+            data = fh.read().decode('utf-8')
             fh.close()
             lines = data.split('\n')
             vectors = []
@@ -149,8 +149,8 @@ class GeonetFetcher(StrongMotionFetcher):
             if len(vectors):
                 idx = vectors.index(min(vectors))
                 return (eidlist[idx],etimelist[idx])
-        except Exception,msg:
-            raise Exception,'Could not access the GeoNet website - got error "%s"' % str(msg)
+        except Exception as msg:
+            raise Exception('Could not access the GeoNet website - got error "%s"' % str(msg))
         return (None,None)
 
 def readheader(lines):
@@ -182,7 +182,7 @@ def readheader(lines):
     hdrdict['npts'] = int(parts[0])
     bufmin = int(parts[8])
     millisec = int(parts[9])
-    bufsec = millisec/1000
+    bufsec = int(millisec/1000)
     bufmicrosec = int(np.round(millisec/1000.0 - bufsec))
     hdrdict['starttime'] = UTCDateTime(datetime(bufyear,bufmonth,bufday,bufhour,bufmin,bufsec,bufmicrosec))
     #part C

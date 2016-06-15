@@ -1,13 +1,13 @@
 #!/usr/bin/env python
 
 #stdlib imports
-import urllib2
-import urlparse
+import urllib.request, urllib.error, urllib.parse
+import urllib.parse
 import os.path
 import argparse
 import re
 import json
-from ConfigParser import ConfigParser,RawConfigParser
+from configparser import ConfigParser,RawConfigParser
 from xml.dom import minidom
 import sys
 from datetime import datetime
@@ -25,36 +25,36 @@ def fetchCDIByParams(etime,lat,lon,config,rawfolder):
     eventlist = comcat.associate({'lat':lat,'lon':lon,'time':etime})
     if len(eventlist) == 0:
         msg = 'Could not find any events within %.1f km and %i seconds of event at %s (%.3f,%.3f)'
-        print msg % (comcat.DISTWINDOW,comcat.TIMEWINDOW,etime,lat,lon)
+        print(msg % (comcat.DISTWINDOW,comcat.TIMEWINDOW,etime,lat,lon))
         sys.exit(1)
     if len(eventlist) > 1:
         msg = 'Found multiple events within %.1f km and %i seconds of event at %s (%.3f,%.3f).  Exiting.'
-        print msg % (comcat.DISTWINDOW,comcat.TIMEWINDOW,etime,lat,lon)
+        print(msg % (comcat.DISTWINDOW,comcat.TIMEWINDOW,etime,lat,lon))
         sys.exit(1)
     url = EVENTURL.replace('[EVENTID]',eventlist[0]['id'])
-    req = urllib2.Request(url)
+    req = urllib.request.Request(url)
     req.add_unredirected_header('User-Agent', 'Custom User-Agent')
-    fh = urllib2.urlopen(req)
+    fh = urllib.request.urlopen(req)
     data = fh.read()
     fh.close()
     jdict = json.loads(data)
-    if 'dyfi' not in jdict['properties']['products'].keys():
-        print 'DYFI product not found for event %s.  Exiting.' % etime
+    if 'dyfi' not in list(jdict['properties']['products'].keys()):
+        print('DYFI product not found for event %s.  Exiting.' % etime)
         sys.exit(1)
     dyfi = jdict['properties']['products']['dyfi'][0]
     durl = None
-    if 'cdi_geo.xml' in dyfi['contents'].keys():
+    if 'cdi_geo.xml' in list(dyfi['contents'].keys()):
         durl = dyfi['contents']['cdi_geo.xml']['url']
     else:
-        if 'cdi_zip.xml' in dyfi['contents'].keys():
+        if 'cdi_zip.xml' in list(dyfi['contents'].keys()):
             durl = dyfi['contents']['cdi_zip.xml']['url']
         else:
-            print 'DYFI product not found for event %s.  Exiting.' % etime
+            print('DYFI product not found for event %s.  Exiting.' % etime)
             sys.exit(1)
-    fh = urllib2.urlopen(durl)
+    fh = urllib.request.urlopen(durl)
     data = fh.read()
     fh.close()
-    urlpath = urlparse.urlsplit(durl).path
+    urlpath = urllib.parse.urlsplit(durl).path
     tmp,fname = os.path.split(urlpath)
     outfname = os.path.join(rawfolder,fname)
     f = open(outfname,'wt')
@@ -105,8 +105,8 @@ def writeCDI(outname,stationlist):
     
 def main(args,config):
     if args.eventID and config is None:
-        print 'To specify event ID, you must have configured the ShakeHome parameter in the config file.'
-        print 'Re-run with -config.  Returning.'
+        print('To specify event ID, you must have configured the ShakeHome parameter in the config file.')
+        print('Re-run with -config.  Returning.')
         sys.exit(1)
 
     #Get the output folder
