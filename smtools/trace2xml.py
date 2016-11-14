@@ -19,6 +19,9 @@ from matplotlib import dates
 FILTER_FREQ = 0.02
 CORNERS = 4
 
+SOURCES = {'knet':'JP',
+           'geonet':'GeoNet'}
+
 def smPSA(data, samp_rate):
     """
     ShakeMap pseudo-spectral parameters
@@ -284,6 +287,9 @@ def trace2xml(traces,parser,outfolder,netsource,doPlot=False,seedresp=None):
                 station_name = trace.stats['station']
                 instrument = ''
                 source = ''
+            if source == '':
+                if netsource in SOURCES:
+                    source = SOURCES[netsource]
             lat = coordinates['latitude']
             lon = coordinates['longitude']
             stationtag = Tag('station',attributes={'code':code,'name':station_name,
