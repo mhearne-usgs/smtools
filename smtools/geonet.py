@@ -25,7 +25,8 @@ from obspy.core.util.geodetics import gps2DistAzimuth
 import numpy as np
 import matplotlib.pyplot as plt
 
-CATBASE = 'http://quakesearch.geonet.org.nz/services/1.0.0/csv?startdate=[START]&enddate=[END]'
+#CATBASE = 'http://quakesearch.geonet.org.nz/services/1.0.0/csv?startdate=[START]&enddate=[END]'
+CATBASE = 'http://quakesearch.geonet.org.nz/csv?bbox=165.45410,-49.18170,181.09863,-32.28713&startdate=[START]&enddate=[END]'
 GEOBASE = 'ftp://ftp.geonet.org.nz/strong/processed/Proc/[YEAR]/[MONTH]/'
 TIMEFMT = '%Y-%m-%dT%H:%M:%S'
 NZTIMEDELTA = 2 #number of seconds allowed between GeoNet catalog time and event timestamp on FTP site
