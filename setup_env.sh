@@ -3,7 +3,7 @@
 VENV=smtools
 PYVER=3.5
 
-DEPARRAY=(numpy scipy matplotlib obspy beautifulsoup4)
+DEPARRAY=(numpy scipy matplotlib obspy beautifulsoup4 rasterio pandas shapely h5py gdal pytest pytest pytest-cov pytest-mpl cartopy basemap)
 
 #turn off whatever other virtual environment user might be in
 source deactivate
@@ -28,6 +28,7 @@ conda install -y psutil
 pip install git+git://github.com/kallstadt-usgs/seisk.git
 pip install git+git://github.com/usgs/neicio.git
 pip install git+git://github.com/usgs/neicmap.git
+pip -v install https://github.com/usgs/MapIO/archive/master.zip
 
 #tell the user they have to activate this environment
 echo "Type 'source activate ${VENV}' to use this new virtual environment."
