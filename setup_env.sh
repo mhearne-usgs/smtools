@@ -3,7 +3,7 @@
 VENV=smtools
 PYVER=3.5
 
-DEPARRAY=(numpy scipy matplotlib obspy)
+DEPARRAY=(numpy scipy matplotlib obspy beautifulsoup4)
 
 #turn off whatever other virtual environment user might be in
 source deactivate
