@@ -163,7 +163,12 @@ def readheader(lines):
     fname = parts[1]
     fparts = fname.split('_')
     hdrdict['station'] = fparts[-2]+'_'+fparts[-1]
-    hdrdict['channel'] = ''
+    t,component = lines[12].split()
+    if component.strip() == 'Up':
+        hdrdict['channel'] = 'Z'
+    else:
+        hdrdict['channel'] = component.strip()
+    
     #location string
     line = lines[6]
     hdrdict['location'] = ''
@@ -225,23 +230,30 @@ def readgeonet(geonetfile):
     @param geonetfile: Path to a valid GeoNet data file.
     @return: List of ObsPy Trace objects, containing accelerometer data in m/s.
     """
+    #notes on implementation:
+    # originally I had written code to read each line of data manually, just
+    # as I was reading the header lines.  However, this became VERY slow for large
+    # files.  I discovered that numpy's genfromtxt function was much faster.  However,
+    # I could not get that function to work when I passed it a file object instead of a file name.
+    # Consequently, the only way I could keep the genfromtxt() method and file pointer in sync was
+    # to read and discard all of the lines of data that genfromtxt() parsed.  While annoying, the combination
+    # of these two seems to still be at least an order of magnitude faster than manually reading the file.
+    
     f = open(geonetfile,'rt')
     tracelist = []
     headerlist = []
-    try:
-        hdrlines = readheaderlines(f)
-    except:
-        pass
+    totlines = 0
+    hdrlines = readheaderlines(f)
     while len(hdrlines[-1]):
+        totlines += len(hdrlines)
         hdrdict = readheader(hdrlines)
         numlines = int(np.ceil(hdrdict['npts']/10.0))
-        data = []
+        data = np.genfromtxt(geonetfile,skip_header=totlines,max_rows=numlines)
+        totlines += numlines
+        #now we need to set the file position to where we just ended
         for i in range(0,numlines):
-            line = f.readline()
-            parts = line.strip().split()
-            mdata = [float(p) for p in parts]
-            data = data + mdata
-        data = np.array(data)
+            f.readline()
+        data = data.flatten()
         header = hdrdict.copy()
         stats = Stats(hdrdict)
         trace = Trace(data,header=stats)
