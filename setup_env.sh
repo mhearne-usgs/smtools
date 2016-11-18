@@ -1,6 +1,6 @@
 #!/bin/bash
 
-VENV=smtools
+VENV=smtoolsenv
 PYVER=3.5
 
 DEPARRAY=(numpy scipy matplotlib obspy beautifulsoup4 rasterio pandas shapely h5py gdal pytest pytest pytest-cov pytest-mpl cartopy basemap)
